@@ -1,0 +1,21 @@
+cmake_minimum_required(VERSION 3.8)
+project(projekt_4)
+
+set(CMAKE_CXX_STANDARD 17)
+
+set(SFML_INCLUDE_DIR "SFML/include")
+
+set(SFML_LIBRARY_DIR "SFML/lib")
+
+set(SFML_LIBRARIES sfml-graphics sfml-window sfml-system)
+
+include_directories(${SFML_INCLUDE_DIR})
+
+link_directories(${SFML_LIBRARY_DIR})
+
+set(SOURCES main.cpp)
+
+add_executable(projekt_4 ${SOURCES})
+
+
+target_link_libraries(projekt_4 ${SFML_LIBRARIES})
