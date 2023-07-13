@@ -1,57 +1,36 @@
-#include <SFML/Graphics.hpp>
 
-
-struct elevator
-{
-    int x_=0;
-    int y_=0;
-void moving (sf::CircleShape &circulo)
-{   
-   sf::sleep(sf::milliseconds(2));
-   if (circulo.getPosition().y>y_)
-   {
-    circulo.move(0,-1);
-   }
-   if (circulo.getPosition().y<y_)
-   {
-    circulo.move(0,1);
-   }
-   
-}
-void set_pos(int x, int y)
-{   
-     x_=x;
-     y_=y;
-}
-
-};
+#include "models.hpp"
 
 int main()
 {
-sf::RenderWindow ventana(sf::VideoMode(800, 800), "Elevator");
-sf::CircleShape circulo(200,200);
-elevator elevador;
-
-circulo.setOrigin(100, 5);
-circulo.setFillColor(sf::Color::Cyan);
-circulo.setPosition(400, 400);
-elevador.set_pos(circulo.getPosition().x, circulo.getPosition().y);
-while (ventana.isOpen())
+int elevator_pos_x=SCREEN_WIDTH/2-ELEVATOR_WIDTH;
+int elevator_pos_y=SCREEN_HEIGHT-ELEVATOR_HIGHT*2-5;
+sf::RenderWindow window(sf::VideoMode(1500, 800), "Elevator");
+elevator m_elevator(elevator_pos_x,elevator_pos_y, sf::Color::Blue);
+button b1(50, 50, sf::Color::Red, '1');
+button b2(50, 150, sf::Color::Red, '2');
+while (window.isOpen())
 {
 sf::Event event;
-while (ventana.pollEvent(event))
+while (window.pollEvent(event))
 {
 if (event.type == sf::Event::Closed)
-ventana.close();
-if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Up)
-    elevador.set_pos(200, 200);
-if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Down)
-    elevador.set_pos(500, 500);
+    window.close();
+if (event.type==sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left)
+    {
+        b1.is_pressed(window, m_elevator, 100);
+        b2.is_pressed(window, m_elevator, 300);
+    }
+        
 }
-elevador.moving(circulo);
-ventana.clear();
-ventana.draw(circulo);
-ventana.display();
+m_elevator.moving();
+
+window.clear();
+
+b1.draw_button(window);
+b2.draw_button(window);
+m_elevator.draw_elevator(window);
+window.display();
 }
 return 0;
 }
