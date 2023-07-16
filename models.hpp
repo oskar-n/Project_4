@@ -91,7 +91,7 @@ class Button{
             m_pos_x=pos_x;
             m_pos_y=pos_y;
             m_color=color;
-            goal=goal;
+            m_goal=goal;
             m_rectangle.setSize(sf::Vector2f(m_width, m_width));
             if (!m_font.loadFromFile("digital-7.ttf"))
             {
@@ -137,8 +137,8 @@ struct move{
 class ObjectManager{
     Elevator m_elevator{SCREEN_WIDTH/2-ELEVATOR_WIDTH,
                         SCREEN_HEIGHT-ELEVATOR_HIGHT*2-5, sf::Color::Blue};
-    Button m_button1{50,50,70,sf::Color::Red, '1'};
-    Button m_button2{50,150,320,sf::Color::Red, '2'};
+    Button m_button1{50,50,50,sf::Color::Red, '1'};
+    Button m_button2{50,150,150,sf::Color::Red, '2'};
     sf::RenderWindow m_window{sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Elevator"};
     std::queue<move> m_orders{};
     public:
@@ -146,6 +146,8 @@ class ObjectManager{
     void loop(){
         while (m_window.isOpen())
         {
+            auto cursor = sf::Mouse::getPosition(m_window);
+            std::cout << cursor.x << " | "<< cursor.y << '\n';
             sf::Event event;
             while (m_window.pollEvent(event))
             {
