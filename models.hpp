@@ -1,7 +1,8 @@
-
 #include <SFML/Graphics.hpp>
 #include <iostream>
 #include <queue>
+#include <array>
+#include <type_traits>
 
 constexpr int SCREEN_WIDTH   =1500;
 constexpr int SCREEN_HEIGHT  =1200;
@@ -10,19 +11,32 @@ constexpr int ELEVATOR_WIDTH =290;
 constexpr int ELEVATOR_HIGHT =190;
 constexpr int FLOOR_HIGHT =40;
 
-template <typename... Args>
-void draw(sf::RenderWindow &win, Args... args){
-    (args.draw(win), ...);
+template <typename T>
+void draw(T &Object, sf::RenderWindow &window){
+    Object.draw(window);
 }
 
-enum
-{
-    Floor_1=950,
-    Floor_2=750,
-    Floor_3=550,
-    Floor_4=350,
-    Floor_5=150,
+template <typename T>
+void draw(std::array<T,5> Object_cont, sf::RenderWindow &window){
+    for (auto &i: Object_cont)
+    {
+        draw(i,window);
+    }
+}
+
+template <typename... Args>
+void draw(sf::RenderWindow &win, Args... args){
+    (draw(args, win), ...);
+}
+
+enum FLOORS{
+    FIRST=950,
+    SECOND=750,
+    THIRD=550,
+    FOURTH=350,
+    FIFTH=150,
 };
+
 class Elevator
 {
     private:
@@ -163,42 +177,34 @@ struct move{
 };
 
 
-class Buttongroup
-{
-    private:
-    int floor_num;
-    public:
-    Button m_button1;
-    Button m_button2;
-    Button m_button3;
-    Button m_button4;
-    Button m_button5;
+using Buttongroup = std::array<Button, 5>; 
 
-     Buttongroup(int pos_x, int pos_y, sf::Color color)
-        : m_button1(pos_x, pos_y, Floor_1, color, '1'),
-          m_button2(pos_x + BUTTON_WIDTH, pos_y, Floor_2, color, '2'),
-          m_button3(pos_x + BUTTON_WIDTH * 2, pos_y, Floor_3, color, '3'),
-          m_button4(pos_x + BUTTON_WIDTH * 3, pos_y, Floor_4, color, '4'),
-          m_button5(pos_x + BUTTON_WIDTH * 4, pos_y, Floor_5, color, '5'),
-          floor_num(pos_y){}
+inline Buttongroup make_buttons(int pos_x, int pos_y, sf::Color color){
+    return Buttongroup{
+        Button(pos_x, pos_y, FLOORS::FIRST, color, '1'),
+        Button(pos_x + BUTTON_WIDTH, pos_y, FLOORS::SECOND, color, '2'),
+        Button(pos_x + BUTTON_WIDTH * 2, pos_y, FLOORS::THIRD, color, '3'),
+        Button(pos_x + BUTTON_WIDTH * 3, pos_y, FLOORS::FOURTH, color, '4'),
+        Button(pos_x + BUTTON_WIDTH * 4, pos_y, FLOORS::FIFTH, color, '5')
+    };
+}
 
-    void draw(sf::RenderWindow &window)
+inline void draw_buttons(Buttongroup &buttons, sf::RenderWindow &window){
+    for (auto &b : buttons)
     {
-        m_button1.draw(window);
-        m_button2.draw(window);
-        m_button3.draw(window);
-        m_button4.draw(window);
-        m_button5.draw(window);
+        b.draw(window);
     }
+}
 
-    void buttongr_pressed(sf::RenderWindow &window, std::queue<move> &orders ){
-        if (m_button1.is_pressed(window))  orders.push({m_button1.m_dest ,m_button1.m_goal, m_button1});
-        if (m_button2.is_pressed(window))  orders.push({m_button2.m_dest,m_button2.m_goal, m_button2});
-        if (m_button3.is_pressed(window))  orders.push({m_button3.m_dest,m_button3.m_goal, m_button3});
-        if (m_button4.is_pressed(window))  orders.push({m_button4.m_dest,m_button4.m_goal, m_button4});
-        if (m_button5.is_pressed(window))  orders.push({m_button5.m_dest,m_button5.m_goal, m_button5});
-    }
-};
+inline void buttongr_pressed(Buttongroup &bg, sf::RenderWindow &window, std::queue<move> &orders){
+    for (auto &b : bg)
+    {
+        if (b.is_pressed(window))
+        {
+            orders.push({b.m_goal, b.m_dest, b});
+        }
+    }    
+}
 
 class Floors{
     private: 
@@ -224,11 +230,11 @@ class Floors{
     }
     void draw(sf::RenderWindow &window)
     {
-        draw_one_floor(window, m_rectangle_1, true, Floor_1);
-        draw_one_floor(window, m_rectangle_2, false, Floor_2);
-        draw_one_floor(window, m_rectangle_3, true, Floor_3);
-        draw_one_floor(window, m_rectangle_4, false, Floor_4);
-        draw_one_floor(window, m_rectangle_5, true, Floor_5);
+        draw_one_floor(window, m_rectangle_1, true, FLOORS::FIRST);
+        draw_one_floor(window, m_rectangle_2, false, FLOORS::SECOND);
+        draw_one_floor(window, m_rectangle_3, true, FLOORS::THIRD);
+        draw_one_floor(window, m_rectangle_4, false, FLOORS::FOURTH);
+        draw_one_floor(window, m_rectangle_5, true, FLOORS::FIFTH);
     }
 
 
@@ -236,12 +242,14 @@ class Floors{
 
 class ObjectManager{
     Elevator m_elevator{SCREEN_WIDTH/2-ELEVATOR_WIDTH/2,
-                        Floor_1, sf::Color::Blue};
-    Buttongroup m_buttongr1{50, Floor_1,sf::Color::Red};
-    Buttongroup m_buttongr2{SCREEN_WIDTH-50-BUTTON_WIDTH*5, Floor_2,sf::Color::Red};
-    Buttongroup m_buttongr3{50, Floor_3,sf::Color::Red};
-    Buttongroup m_buttongr4{SCREEN_WIDTH-50-BUTTON_WIDTH*5, Floor_4,sf::Color::Red};
-    Buttongroup m_buttongr5{50, Floor_5,sf::Color::Red};
+                        FLOORS::FIRST, sf::Color::Blue};
+    std::array<Buttongroup, 5> m_buttongroups = {
+        make_buttons(50, FLOORS::FIRST,sf::Color::Red),
+        make_buttons(SCREEN_WIDTH-50-BUTTON_WIDTH*5, FLOORS::SECOND,sf::Color::Red),
+        make_buttons(50, FLOORS::THIRD,sf::Color::Red),
+        make_buttons(SCREEN_WIDTH-50-BUTTON_WIDTH*5, FLOORS::FOURTH,sf::Color::Red),
+        make_buttons(50, FLOORS::FIFTH,sf::Color::Red)
+    };
     Floors m_floors{0, sf::Color::Blue};
     sf::RenderWindow m_window{sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Elevator"};
     std::queue<move> m_orders{};
@@ -261,11 +269,9 @@ class ObjectManager{
                     m_window.close();
                 if (event.type==sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left)
                 {
-                    m_buttongr1.buttongr_pressed(m_window, m_orders);
-                    m_buttongr2.buttongr_pressed(m_window, m_orders);
-                    m_buttongr3.buttongr_pressed(m_window, m_orders);
-                    m_buttongr4.buttongr_pressed(m_window, m_orders);
-                    m_buttongr5.buttongr_pressed(m_window, m_orders);
+                    for(auto i : m_buttongroups){
+                        buttongr_pressed(i,m_window, m_orders);
+                    }
                 }
 
             }
@@ -293,7 +299,7 @@ class ObjectManager{
                 m_orders.pop();
             }
             m_window.clear(sf::Color(255, 255, 255));
-            draw(m_window,m_elevator, m_buttongr1, m_buttongr2,m_buttongr3,m_buttongr4,m_buttongr5, m_floors);
+            draw(m_window,m_elevator, m_buttongroups, m_floors);
             m_window.display();
         }
     }
