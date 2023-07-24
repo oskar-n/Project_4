@@ -2,7 +2,6 @@
 #include <iostream>
 #include <queue>
 #include <array>
-#include <type_traits>
 
 constexpr int SCREEN_WIDTH   =1500;
 constexpr int SCREEN_HEIGHT  =1200;
@@ -17,7 +16,7 @@ void draw(T &Object, sf::RenderWindow &window){
 }
 
 template <typename T>
-void draw(std::array<T,5> Object_cont, sf::RenderWindow &window){
+void draw(std::array<T,5> &Object_cont, sf::RenderWindow &window){
     for (auto &i: Object_cont)
     {
         draw(i,window);
@@ -206,39 +205,39 @@ inline void buttongr_pressed(Buttongroup &bg, sf::RenderWindow &window, std::que
     }    
 }
 
-class Floors{
-    private: 
+struct Floor {
+    int m_width = (SCREEN_WIDTH-ELEVATOR_WIDTH-10)/2;
+    int m_hight = FLOOR_HIGHT;
+    bool is_left;
     int m_pos_x;
-    int m_width=(SCREEN_WIDTH-ELEVATOR_WIDTH-10)/2;
-    int m_hight=FLOOR_HIGHT;
-    sf::Color m_color;
-    sf::RectangleShape m_rectangle_1;
-    sf::RectangleShape m_rectangle_2;
-    sf::RectangleShape m_rectangle_3;
-    sf::RectangleShape m_rectangle_4;
-    sf::RectangleShape m_rectangle_5;
-    public:
-    Floors(int pos_x, sf::Color color): m_pos_x(pos_x), m_color(color){}
-
-    void draw_one_floor(sf::RenderWindow &window, sf::RectangleShape &rectangle, bool is_left, int pos_y)
-    {
+    FLOORS m_pos_y;
+    sf::RectangleShape rectangle;
+    sf::Color color;
+    Floor(int pos_x, FLOORS pos_y, sf::Color color, bool is_left) : m_pos_x(pos_x), m_pos_y(pos_y), color(color), is_left(is_left) {
         rectangle.setSize(sf::Vector2f(m_width, m_hight));
-        rectangle.setFillColor(m_color);
-        if(is_left)rectangle.setPosition(m_pos_x, pos_y+ELEVATOR_HIGHT);
-        else rectangle.setPosition(SCREEN_WIDTH-m_pos_x-m_width, pos_y+ELEVATOR_HIGHT);
+        rectangle.setFillColor(color);
+        rectangle.setOutlineColor(sf::Color::Yellow);
+        rectangle.setOutlineThickness(5);
+        if(is_left)rectangle.setPosition(m_pos_x, m_pos_y+ELEVATOR_HIGHT);
+        else rectangle.setPosition(SCREEN_WIDTH-m_pos_x-m_width, m_pos_y+ELEVATOR_HIGHT);
+    }
+
+    void draw(sf::RenderWindow &window){
         window.draw(rectangle);
     }
-    void draw(sf::RenderWindow &window)
-    {
-        draw_one_floor(window, m_rectangle_1, true, FLOORS::FIRST);
-        draw_one_floor(window, m_rectangle_2, false, FLOORS::SECOND);
-        draw_one_floor(window, m_rectangle_3, true, FLOORS::THIRD);
-        draw_one_floor(window, m_rectangle_4, false, FLOORS::FOURTH);
-        draw_one_floor(window, m_rectangle_5, true, FLOORS::FIFTH);
-    }
-
-
 };
+
+using Floors = std::array<Floor, 5>;
+
+inline Floors make_floors(int pos_x, sf::Color color){
+    return {
+        Floor(pos_x, FLOORS::FIRST, color, true),
+        Floor(pos_x, FLOORS::SECOND, color, false),
+        Floor(pos_x, FLOORS::THIRD, color, true),
+        Floor(pos_x, FLOORS::FOURTH, color, false),
+        Floor(pos_x, FLOORS::FIFTH, color, true)
+    };
+}
 
 class ObjectManager{
     Elevator m_elevator{SCREEN_WIDTH/2-ELEVATOR_WIDTH/2,
@@ -250,7 +249,7 @@ class ObjectManager{
         make_buttons(SCREEN_WIDTH-50-BUTTON_WIDTH*5, FLOORS::FOURTH,sf::Color::Red),
         make_buttons(50, FLOORS::FIFTH,sf::Color::Red)
     };
-    Floors m_floors{0, sf::Color::Blue};
+    Floors m_floors = make_floors(0, sf::Color::Green);
     sf::RenderWindow m_window{sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Elevator"};
     std::queue<move> m_orders{};
     public:
@@ -259,7 +258,7 @@ class ObjectManager{
         while (m_window.isOpen())
         {
             auto cursor = sf::Mouse::getPosition(m_window);
-            std::cout << cursor.x << " | "<< cursor.y << '\n';
+            // std::cout << cursor.x << " | "<< cursor.y << '\n';
             sf::Event event;
             while (m_window.pollEvent(event))
             {
@@ -287,7 +286,7 @@ class ObjectManager{
                 m_elevator.reach_check(); 
             }
             m_elevator.moving();
-            std::cout<<"             "<<m_elevator.is_reached_beg<<"   "<<m_elevator.is_reached_goal<<std::endl;
+            // std::cout<<"             "<<m_elevator.is_reached_beg<<"   "<<m_elevator.is_reached_goal<<std::endl;
             if (!m_elevator.is_moving() && !m_orders.empty() && m_elevator.is_reached_beg==true)
             {
                 m_orders.front().b.make_red();
@@ -303,6 +302,5 @@ class ObjectManager{
             m_window.display();
         }
     }
-
 };
 
