@@ -11,12 +11,18 @@ constexpr int ELEVATOR_HIGHT =190;
 constexpr int FLOOR_HIGHT =40;
 
 template <typename T>
+concept Container = requires(T t) {
+    {t.begin()} -> std::same_as<typename T::iterator>;
+    {t.end()} -> std::same_as<typename T::iterator>;
+};
+
+template <typename T>
 void draw(T &Object, sf::RenderWindow &window){
     Object.draw(window);
 }
 
-template <typename T>
-void draw(std::array<T,5> &Object_cont, sf::RenderWindow &window){
+template <Container C>
+void draw(C &Object_cont, sf::RenderWindow &window){
     for (auto &i: Object_cont)
     {
         draw(i,window);
