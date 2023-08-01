@@ -44,6 +44,7 @@ class Elevator
         int m_width=ELEVATOR_WIDTH;
         int m_hight=ELEVATOR_HIGHT;
         bool m_is_moving=false;
+         bool m_should_move=true;
         sf::Color m_color;
         sf::RectangleShape m_rectangle;
     public:
@@ -60,7 +61,9 @@ class Elevator
 
         void moving ()
         {   
-            sf::sleep(sf::milliseconds(2)); 
+            if(m_should_move)
+            {
+                sf::sleep(sf::milliseconds(2)); 
             if (m_rectangle.getPosition().y>m_y)
             {
                 m_rectangle.move(0,-1);
@@ -75,12 +78,18 @@ class Elevator
                 return;
             }
             m_is_moving=true;
+            };
 
         }
 
         bool is_moving()
         {
             return m_is_moving;
+        }
+
+        bool shoud_move()
+        {
+            return m_should_move;
         }
 
         void set_pos(int x, int y)
@@ -113,7 +122,20 @@ class Elevator
         }
 
         void elevator_pause(){
-            sf::sleep(sf::milliseconds(700));
+            static int i=1;
+            if(i%500==0)
+            {
+                i=0;
+                m_should_move=true;
+            }
+            else 
+            {
+               m_should_move=false;
+            }
+            i++;
+            
+            
+           std::cout<<i<<"||"<<m_should_move<<std::endl;
         }
 };
 
@@ -258,7 +280,6 @@ class Human{
     }
 
     void draw(sf::RenderWindow &window){
-        m_sprite.setPosition(m_x,m_y);
         m_sprite.setScale(0.1,0.1);
         window.draw(m_sprite);
     }
@@ -269,12 +290,28 @@ class Human{
         else
             m_x=SCREEN_WIDTH-50-m_sprite.getGlobalBounds().width*0.1;
         m_y=y+m_sprite.getGlobalBounds().height*0.1;
+
+        m_sprite.setPosition(m_x,m_y);
     }
 
-    void human_move(int x, int y){
-        m_sprite.setPosition(x,y);
-    }
 
+    void animation(){
+       {
+                sf::sleep(sf::milliseconds(2)); 
+            if (m_sprite.getPosition().x>m_x)
+            {
+                m_sprite.move(0,-1);
+            }
+            if (m_sprite.getPosition().y<m_y)
+            {
+                m_sprite.move(0,1);
+            }
+            if(m_sprite.getPosition().y == m_y)
+            {
+                return;
+            }
+            };
+    }
    
 };
 
@@ -329,22 +366,26 @@ class ObjectManager{
                 m_elevator.reach_check(); 
             }
 
-            std::cout<<human_is<<std::endl;
             m_elevator.moving();
+            m_human.animation();
             if (!m_elevator.is_moving() && !m_orders.empty() && m_elevator.is_reached_beg==true)
             m_elevator.elevator_pause();
-            if (!m_elevator.is_moving() && !m_orders.empty() && m_elevator.is_reached_goal==true)
+            if (!m_elevator.is_moving() && !m_orders.empty() && m_elevator.is_reached_goal==true) //operation to keep elevator at floor for the animation to happen
             {
+                if(!m_elevator.shoud_move()) 
+                m_elevator.elevator_pause();
+               else {
                 m_elevator.is_reached_beg=false;
                 m_elevator.is_reached_goal=false;
                 m_orders.front().b.make_red();
                 m_orders.pop();
-                m_elevator.elevator_pause();
                 human_is=false;
+                }
             }
-            
             m_window.clear(sf::Color(255, 255, 255));
-            draw(m_window,m_elevator, m_buttongroups, m_floors, m_human);
+
+            if(human_is) draw(m_window, m_human);
+            draw(m_window,m_elevator, m_buttongroups, m_floors);
             m_window.display();
         }
     }
