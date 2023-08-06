@@ -188,9 +188,8 @@ class Button{
             window.draw(m_text);
         }
 
-        bool is_pressed(sf::RenderWindow &window)
+        bool is_pressed(sf::Vector2i const &mouse_pos)
         {
-            sf::Vector2i mouse_pos = sf::Mouse::getPosition(window);
             if (mouse_pos.x>m_pos_x && mouse_pos.x<m_pos_x+m_width && mouse_pos.y>m_pos_y && mouse_pos.y<m_pos_y+m_width)
             {
                 m_color=sf::Color::Green;
@@ -261,18 +260,21 @@ inline Floors make_floors(int pos_x, sf::Color color){
 
 class Human{
     private:
-    sf::Texture m_texture;
+    static sf::Texture m_texture;
     sf::Sprite m_sprite;
     int m_x=2000;
     int m_y=2000;
     public:
     Human(){
-        if (!m_texture.loadFromFile("human.png"))
-        {
-            std::cerr<<"Error loading image"<<std::endl;
-        }
         m_sprite.setTexture(m_texture);
         m_sprite.setScale(0.1,0.1);
+    }
+
+    static void load_texture(){
+        if (!m_texture.loadFromFile("human.png"))
+        {
+            std::cout<<"Error loading texture"<<std::endl;
+        }
     }
 
     void draw(sf::RenderWindow &window) const {
@@ -285,7 +287,6 @@ class Human{
         else
             m_x=SCREEN_WIDTH-50-m_sprite.getGlobalBounds().width*0.1;
         m_y=y+m_sprite.getGlobalBounds().height*0.1;
-
         m_sprite.setPosition(m_x,m_y);
     }
 
@@ -310,7 +311,7 @@ class ObjectManager{
     Elevator m_elevator{SCREEN_WIDTH/2-ELEVATOR_WIDTH/2,
                         FLOORS::FIRST, sf::Color::Blue};
     std::array<Buttongroup, 5> m_buttongroups = {
-        make_buttons(50, FLOORS::FIRST,sf::Color::Red  ),
+        make_buttons(50, FLOORS::FIRST,sf::Color::Red),
         make_buttons(SCREEN_WIDTH-50-BUTTON_WIDTH*5, FLOORS::SECOND,sf::Color::Red),
         make_buttons(50, FLOORS::THIRD,sf::Color::Red),
         make_buttons(SCREEN_WIDTH-50-BUTTON_WIDTH*5, FLOORS::FOURTH,sf::Color::Red),
@@ -324,7 +325,7 @@ class ObjectManager{
     void buttongr_pressed(Buttongroup &bg){
         for (auto &b : bg)
         {
-            if (b.is_pressed(m_window))
+            if (b.is_pressed(sf::Mouse::getPosition(m_window)))
             {
                 m_orders.push({b.m_beg, b.m_goal, b});
                 m_humans.emplace_back(Human());
@@ -355,42 +356,53 @@ class ObjectManager{
     void handle_no_orders(){
         if(!m_orders.empty())
         {
-            if(m_elevator.is_reached_beg==false){
+            if(m_elevator.is_reached_beg==false)
+            {
                 m_elevator.set_pos(0, m_orders.front().beg_floor);
             }
-            else {
+            else
+            {
                 m_elevator.set_pos(0, m_orders.front().goal_floor);
             }
             m_elevator.reach_check(); 
         }
     }
 
+    //will be called once at the beginning
+    void start(){
+        Human::load_texture();
+    }
+
+    //will be called once per frame
     void loop(){
         while (m_window.isOpen())
         {
-            auto cursor = sf::Mouse::getPosition(m_window);
-            // std::cout << cursor.x << " | "<< cursor.y << '\n';
+            bool elevator_reached_beg  = !m_elevator.is_moving() &&
+                                         !m_orders.empty()       && 
+                                          m_elevator.is_reached_beg ==true;
+            bool elevator_reached_goal = !m_elevator.is_moving() &&
+                                         !m_orders.empty()       && 
+                                          m_elevator.is_reached_goal==true;
             handle_events();
             handle_no_orders();
             m_elevator.moving();
-            if (!m_elevator.is_moving() && !m_orders.empty() && m_elevator.is_reached_beg==true)
+            if (elevator_reached_beg)
                 m_elevator.elevator_pause();
-            if (!m_elevator.is_moving() && !m_orders.empty() && m_elevator.is_reached_goal==true) //operation to keep elevator at floor for the animation to happen
+            if (elevator_reached_goal) //operation to keep elevator at floor for the animation to happen
             {
                 if(!m_elevator.should_move()) 
                     m_elevator.elevator_pause();
-                else {
-                    m_elevator.is_reached_beg=false;
+                else 
+                {
+                    m_elevator.is_reached_beg =false;
                     m_elevator.is_reached_goal=false;
-                    // m_orders.front().b.make_red();
                     m_orders.pop();
                     m_humans.erase(m_humans.begin());
                 }
             }
-            m_window.clear(sf::Color(255, 255, 255));
+            m_window.clear(sf::Color::White);
             draw(m_window,m_elevator, m_buttongroups, m_floors, m_humans);
             m_window.display();
         }
     }
 };
-
