@@ -261,7 +261,8 @@ inline Floors make_floors(int pos_x, sf::Color color){
 class Human{
     static sf::Texture m_texture;
     sf::Sprite m_sprite;
-    int m_speed = -1;
+    int m_speed = -10;
+    bool m_startedmoving = false;
     void human_set_pos(int y){
         int m_x;
         if(FLOORS::FIRST==y || FLOORS::THIRD==y || FLOORS::FIFTH==y)
@@ -288,12 +289,25 @@ class Human{
         }
     }
 
+    void rotate(double dt){
+        static int angle = 30;
+        if(!m_startedmoving){
+            m_sprite.rotate(angle*dt);
+        }
+        else{
+            m_sprite.rotate(2*angle*dt);
+        }
+        angle = -angle;
+        m_startedmoving = true;
+    }
+
     bool move(int elevator_x, double dt){
-        auto human_x = m_sprite.getPosition().x;
+        const auto human_x = m_sprite.getPosition().x;
         if(human_x == elevator_x){
             return false;
         }
-        m_sprite.move(m_speed,0);
+        m_sprite.move(m_speed*dt,0);
+        rotate(dt);
         std::cout << "human_x: " << human_x << " elevator_x: " << elevator_x << std::endl;
         return true;
     }
@@ -318,7 +332,7 @@ class ObjectManager{
     sf::RenderWindow m_window{sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Elevator"};
     std::queue<Move> m_orders{};
     std::vector<Human> m_humans{};
-    const double dt = 0.001;
+    const double dt = 0.1;
 
     void buttongr_pressed(Buttongroup &bg){
         for (auto &b : bg)
@@ -383,11 +397,11 @@ class ObjectManager{
             handle_events();
             handle_no_orders();
 
-            if((!m_elevator.moving() && !m_humans.empty()) && !m_humans.front().move(m_elevator.get_x(), dt)){
-                m_elevator.start();
+            if(!m_elevator.moving() && !m_humans.empty() && m_humans.front().move(m_elevator.get_x(), dt)){
+                m_elevator.pause();
             }
             else{
-                m_elevator.pause();
+                m_elevator.start();
             }
 
             if (elevator_reached_beg)
