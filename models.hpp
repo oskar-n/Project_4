@@ -51,7 +51,7 @@ class Elevator
         int m_width=ELEVATOR_WIDTH;
         int m_hight=ELEVATOR_HIGHT;
         bool m_is_moving=false;
-         bool m_should_move=true;
+        bool m_should_move=true;
         sf::Color m_color;
         sf::RectangleShape m_rectangle;
     public:
@@ -65,27 +65,37 @@ class Elevator
             m_rectangle.setPosition(m_x, m_y);
         }
 
+        int get_x() const
+        {
+            return m_rectangle.getPosition().x;
+        }
 
-        void moving ()
+        int get_y() const
+        {
+            return m_rectangle.getPosition().y;
+        }
+
+        bool moving ()
         {   
             if(m_should_move)
             {
-            if (m_rectangle.getPosition().y>m_y)
-            {
-                m_rectangle.move(0,-1);
-            }
-            if (m_rectangle.getPosition().y<m_y)
-            {
-                m_rectangle.move(0,1);
-            }
-            if(m_rectangle.getPosition().y == m_y)
-            {
-                m_is_moving=false;
-                return;
-            }
-            m_is_moving=true;
+                if (m_rectangle.getPosition().y>m_y)
+                {
+                    m_rectangle.move(0,-1);
+                }
+                if (m_rectangle.getPosition().y<m_y)
+                {
+                    m_rectangle.move(0,1);
+                }
+                if(m_rectangle.getPosition().y == m_y)
+                {
+                    m_is_moving=false;
+                    return false;
+                }
+                m_is_moving=true;
+                return true;
             };
-
+            return false;
         }
 
         bool is_moving()
@@ -127,21 +137,11 @@ class Elevator
             }
         }
 
-        void elevator_pause(){
-           //  static int i=1;
-           //  if(i%500==0)
-           //  {
-           //      i=0;
-           //      m_should_move=true;
-           //  }
-           //  else 
-           //  {
-           //     m_should_move=false;
-           //  }
-           //  i++;
-           //  
-           //  
-           // std::cout<<i<<"||"<<m_should_move<<std::endl;
+        void pause(){
+            is_reached_beg=false;
+        }
+        void start(){
+            m_should_move=true;
         }
 };
 
@@ -199,7 +199,7 @@ class Button{
         }
 };
 
-struct move{
+struct Move{
     int beg_floor;
     int goal_floor;
     Button &b;
@@ -259,15 +259,26 @@ inline Floors make_floors(int pos_x, sf::Color color){
 }
 
 class Human{
-    private:
     static sf::Texture m_texture;
     sf::Sprite m_sprite;
-    int m_x=2000;
-    int m_y=2000;
+    int m_speed = -1;
+    void human_set_pos(int y){
+        int m_x;
+        if(FLOORS::FIRST==y || FLOORS::THIRD==y || FLOORS::FIFTH==y)
+        {
+            m_x=50;
+            m_speed = -m_speed;
+        }
+        else
+            m_x=SCREEN_WIDTH-50-m_sprite.getGlobalBounds().width*0.1;
+        int m_y=y+m_sprite.getGlobalBounds().height*0.1;
+        m_sprite.setPosition(m_x,m_y);
+    }
     public:
-    Human(){
+    Human(int y){
         m_sprite.setTexture(m_texture);
         m_sprite.setScale(0.1,0.1);
+        human_set_pos(y);
     }
 
     static void load_texture(){
@@ -277,34 +288,20 @@ class Human{
         }
     }
 
+    bool move(int elevator_x, double dt){
+        auto human_x = m_sprite.getPosition().x;
+        if(human_x == elevator_x){
+            return false;
+        }
+        m_sprite.move(m_speed,0);
+        std::cout << "human_x: " << human_x << " elevator_x: " << elevator_x << std::endl;
+        return true;
+    }
+
     void draw(sf::RenderWindow &window) const {
         window.draw(m_sprite);
     }
 
-    void human_set_pos(int y){
-        if(FLOORS::FIRST==y || FLOORS::THIRD==y || FLOORS::FIFTH==y)
-            m_x=50;
-        else
-            m_x=SCREEN_WIDTH-50-m_sprite.getGlobalBounds().width*0.1;
-        m_y=y+m_sprite.getGlobalBounds().height*0.1;
-        m_sprite.setPosition(m_x,m_y);
-    }
-
-
-    void animation() {
-            if (m_sprite.getPosition().x>m_x)
-            {
-                m_sprite.move(0,-1);
-            }
-            if (m_sprite.getPosition().y<m_y)
-            {
-                m_sprite.move(0,1);
-            }
-            if(m_sprite.getPosition().y == m_y)
-            {
-                return;
-            }
-    }
 };
 
 class ObjectManager{
@@ -319,8 +316,9 @@ class ObjectManager{
     };
     Floors m_floors = make_floors(0, sf::Color::Green);
     sf::RenderWindow m_window{sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Elevator"};
-    std::queue<move> m_orders{};
+    std::queue<Move> m_orders{};
     std::vector<Human> m_humans{};
+    const double dt = 0.001;
 
     void buttongr_pressed(Buttongroup &bg){
         for (auto &b : bg)
@@ -328,9 +326,8 @@ class ObjectManager{
             if (b.is_pressed(sf::Mouse::getPosition(m_window)))
             {
                 m_orders.push({b.m_beg, b.m_goal, b});
-                m_humans.emplace_back(Human());
+                m_humans.emplace_back(Human(b.m_beg));
                 std::cout<<"human created"<<std::endl;
-                m_humans.back().human_set_pos(m_orders.front().beg_floor);
             }
         }    
     }
@@ -385,19 +382,27 @@ class ObjectManager{
                                           m_elevator.is_reached_goal==true;
             handle_events();
             handle_no_orders();
-            m_elevator.moving();
+
+            if((!m_elevator.moving() && !m_humans.empty()) && !m_humans.front().move(m_elevator.get_x(), dt)){
+                m_elevator.start();
+            }
+            else{
+                m_elevator.pause();
+            }
+
             if (elevator_reached_beg)
-                m_elevator.elevator_pause();
-            if (elevator_reached_goal) //operation to keep elevator at floor for the animation to happen
             {
-                if(!m_elevator.should_move()) 
-                    m_elevator.elevator_pause();
-                else 
+            }
+
+            if (elevator_reached_goal) 
+            {
+                if(m_elevator.should_move()) 
                 {
                     m_elevator.is_reached_beg =false;
                     m_elevator.is_reached_goal=false;
                     m_orders.pop();
                     m_humans.erase(m_humans.begin());
+                    std::cout << "human deleted" << std::endl;
                 }
             }
             m_window.clear(sf::Color::White);
