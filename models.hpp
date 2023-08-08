@@ -46,7 +46,7 @@ enum FLOORS{
 class Elevator
 {
     private:
-        int m_x=0;
+        const int m_x=SCREEN_WIDTH/2 - ELEVATOR_WIDTH/2;
         int m_y=0;
         int m_width=ELEVATOR_WIDTH;
         int m_hight=ELEVATOR_HIGHT;
@@ -57,17 +57,15 @@ class Elevator
     public:
         bool is_reached_beg=false;
         bool is_reached_goal=false;
-        Elevator(int x, int y, sf::Color color)
+        Elevator(int y, sf::Color color)
         {
-            m_x=x;
             m_y=y;
             m_color=color;
             m_rectangle.setPosition(m_x, m_y);
         }
 
-        int get_x() const
-        {
-            return m_rectangle.getPosition().x;
+        int get_x() const {
+            return m_x;
         }
 
         int get_y() const
@@ -94,7 +92,7 @@ class Elevator
                 }
                 m_is_moving=true;
                 return true;
-            };
+            }
             return false;
         }
 
@@ -108,9 +106,8 @@ class Elevator
             return m_should_move;
         }
 
-        void set_pos(int x, int y)
+        void set_pos(int y)
         {   
-            m_x=x;
             m_y=y;
         }
 
@@ -263,31 +260,7 @@ class Human{
     sf::Sprite m_sprite;
     int m_speed = -10;
     bool m_startedmoving = false;
-    void human_set_pos(int y){
-        int m_x;
-        if(FLOORS::FIRST==y || FLOORS::THIRD==y || FLOORS::FIFTH==y)
-        {
-            m_x=50;
-            m_speed = -m_speed;
-        }
-        else
-            m_x=SCREEN_WIDTH-50-m_sprite.getGlobalBounds().width*0.1;
-        int m_y=y+m_sprite.getGlobalBounds().height*0.1;
-        m_sprite.setPosition(m_x,m_y);
-    }
-    public:
-    Human(int y){
-        m_sprite.setTexture(m_texture);
-        m_sprite.setScale(0.1,0.1);
-        human_set_pos(y);
-    }
-
-    static void load_texture(){
-        if (!m_texture.loadFromFile("human.png"))
-        {
-            std::cout<<"Error loading texture"<<std::endl;
-        }
-    }
+    bool m_should_appear = true;
 
     void rotate(double dt){
         static int angle = 30;
@@ -301,26 +274,77 @@ class Human{
         m_startedmoving = true;
     }
 
-    bool move(int elevator_x, double dt){
+
+    public:
+    bool finished_moving = false;
+
+    Human(int y){
+        m_sprite.setTexture(m_texture);
+        m_sprite.setScale(0.1,0.1);
+        set_pos(y);
+    }
+
+    void flip_direction(){
+        m_speed = -m_speed;
+    }
+
+    void set_pos(int y,int x=50){
+        int m_x;
+        if(FLOORS::FIRST==y || FLOORS::THIRD==y || FLOORS::FIFTH==y){
+            m_x=x;
+            m_speed = -m_speed;
+        }
+        else{
+            x == 50 ? m_x=SCREEN_WIDTH-50-m_sprite.getGlobalBounds().width*0.1 : m_x=x;
+        }
+        int m_y=y+m_sprite.getGlobalBounds().height*0.1;
+        m_sprite.setPosition(m_x,m_y);
+    }
+
+    static void load_texture(){
+        if (!m_texture.loadFromFile("human.png"))
+        {
+            std::cout<<"Error loading texture"<<std::endl;
+        }
+    }
+    bool move(int goal_x, double dt){
         const auto human_x = m_sprite.getPosition().x;
-        if(human_x == elevator_x){
+        if(human_x == goal_x){
+            finished_moving = true;
             return false;
         }
         m_sprite.move(m_speed*dt,0);
         rotate(dt);
-        std::cout << "human_x: " << human_x << " elevator_x: " << elevator_x << std::endl;
+        std::cout << "human_x: " << human_x << " goal: " << goal_x << std::endl;
         return true;
     }
 
-    void draw(sf::RenderWindow &window) const {
-        window.draw(m_sprite);
+    void hide() {
+        m_should_appear = false;
     }
 
+
+    void show(){
+        m_should_appear = true;
+    }
+
+    void draw(sf::RenderWindow &window) const {
+        if(m_should_appear)
+            window.draw(m_sprite);
+    }
 };
 
+inline int get_boundry(FLOORS floor){
+    if(FLOORS::FIRST==floor || FLOORS::THIRD==floor || FLOORS::FIFTH==floor){
+        return 0;
+    }
+    else{
+        return SCREEN_WIDTH;
+    }
+}
+
 class ObjectManager{
-    Elevator m_elevator{SCREEN_WIDTH/2-ELEVATOR_WIDTH/2,
-                        FLOORS::FIRST, sf::Color::Blue};
+    Elevator m_elevator{FLOORS::FIRST, sf::Color::Blue};
     std::array<Buttongroup, 5> m_buttongroups = {
         make_buttons(50, FLOORS::FIRST,sf::Color::Red),
         make_buttons(SCREEN_WIDTH-50-BUTTON_WIDTH*5, FLOORS::SECOND,sf::Color::Red),
@@ -364,16 +388,16 @@ class ObjectManager{
         }
     }
 
-    void handle_no_orders(){
+    void handle_orders(){
         if(!m_orders.empty())
         {
             if(m_elevator.is_reached_beg==false)
             {
-                m_elevator.set_pos(0, m_orders.front().beg_floor);
+                m_elevator.set_pos(m_orders.front().beg_floor);
             }
             else
             {
-                m_elevator.set_pos(0, m_orders.front().goal_floor);
+                m_elevator.set_pos(m_orders.front().goal_floor);
             }
             m_elevator.reach_check(); 
         }
@@ -388,35 +412,56 @@ class ObjectManager{
     void loop(){
         while (m_window.isOpen())
         {
-            bool elevator_reached_beg  = !m_elevator.is_moving() &&
-                                         !m_orders.empty()       && 
-                                          m_elevator.is_reached_beg ==true;
-            bool elevator_reached_goal = !m_elevator.is_moving() &&
-                                         !m_orders.empty()       && 
-                                          m_elevator.is_reached_goal==true;
             handle_events();
-            handle_no_orders();
+            handle_orders();
 
-            if(!m_elevator.moving() && !m_humans.empty() && m_humans.front().move(m_elevator.get_x(), dt)){
+
+            auto &current_human = m_humans.front(); //can be a nullptr
+
+            bool elevator_moving = m_elevator.moving();
+            bool elevator_reached_beg  = !elevator_moving && // TODO: maybe unnecessary
+                                         !m_orders.empty()       && 
+                                          m_elevator.is_reached_beg;
+
+            bool elevator_reached_goal = !elevator_moving &&
+                                         !m_orders.empty()       && 
+                                          m_elevator.is_reached_goal;
+
+            bool human_should_move     = !elevator_moving    &&  // crazy stuff, if either of the 2 first conditions is true, the 3rd one is not checked. Checking it first would cause a segfault.
+                                                                 // so order of operations matters here
+                                         !m_humans.empty()   && 
+                                         !current_human.finished_moving&&
+                                          current_human.move(m_elevator.get_x(), dt);
+
+            if(human_should_move){
                 m_elevator.pause();
+                std::cout << "human should move" << std::endl;
             }
             else{
+                 if(!m_humans.empty() && current_human.finished_moving)
+                    current_human.hide();
                 m_elevator.start();
             }
-
-            if (elevator_reached_beg)
+           
+            if(!elevator_moving && !m_humans.empty() && current_human.finished_moving)
             {
+                current_human.show();
+                current_human.move(0, dt);
+                if(!current_human.finished_moving)
+                    m_humans.erase(m_humans.begin());
             }
+
 
             if (elevator_reached_goal) 
             {
+                current_human.set_pos(m_elevator.get_y(), m_elevator.get_x());
                 if(m_elevator.should_move()) 
                 {
                     m_elevator.is_reached_beg =false;
                     m_elevator.is_reached_goal=false;
                     m_orders.pop();
-                    m_humans.erase(m_humans.begin());
-                    std::cout << "human deleted" << std::endl;
+                    // m_humans.erase(m_humans.begin());
+                    // std::cout << "human deleted" << std::endl;
                 }
             }
             m_window.clear(sf::Color::White);
