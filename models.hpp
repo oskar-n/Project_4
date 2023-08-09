@@ -292,12 +292,12 @@ class Human{
         int m_x;
         if(FLOORS::FIRST==y || FLOORS::THIRD==y || FLOORS::FIFTH==y){
             m_x=x;
-            m_speed = -m_speed;
+            flip_direction(); // see swap_direction 
         }
         else{
-            x == 50 ? m_x=SCREEN_WIDTH-50-m_sprite.getGlobalBounds().width*0.1 : m_x=x;
+            x == 50 ? m_x=SCREEN_WIDTH-50-m_sprite.getGlobalBounds().width : m_x=x;
         }
-        int m_y=y+m_sprite.getGlobalBounds().height*0.1;
+        int m_y=y+m_sprite.getGlobalBounds().height;
         m_sprite.setPosition(m_x,m_y);
     }
 
@@ -307,10 +307,14 @@ class Human{
             std::cout<<"Error loading texture"<<std::endl;
         }
     }
-    bool move(int goal_x, double dt){
+    bool move(int goal_x, double dt, bool swap_direction){
         const auto human_x = m_sprite.getPosition().x;
         if(human_x == goal_x){
             finished_moving = true;
+            if(swap_direction){
+                flip_direction();
+                std::cout << "flipped" << std::endl;
+            }
             return false;
         }
         m_sprite.move(m_speed*dt,0);
@@ -408,6 +412,27 @@ class ObjectManager{
         Human::load_texture();
     }
 
+    bool swap_direction(Move m){  //function handles if the direction should be swapped to avoid double swapping 
+        bool beg_is_right;
+        bool goal_is_right;
+        if(m.beg_floor==FLOORS::FOURTH || m.beg_floor==FLOORS::SECOND){
+            beg_is_right = true;
+        }
+        else beg_is_right = false;
+
+        if(m.goal_floor==FLOORS::FOURTH || m.goal_floor==FLOORS::SECOND){
+            goal_is_right = true;
+        }
+        else goal_is_right = false;
+
+        if(goal_is_right && beg_is_right)
+            return true;
+        if(!goal_is_right && beg_is_right)
+            return true;
+        else return false;
+
+
+    }
     //will be called once per frame
     void loop(){
         while (m_window.isOpen())
@@ -431,7 +456,7 @@ class ObjectManager{
                                                                  // so order of operations matters here
                                          !m_humans.empty()   && 
                                          !current_human.finished_moving&&
-                                          current_human.move(m_elevator.get_x(), dt);
+                                          current_human.move(m_elevator.get_x(), dt, swap_direction(m_orders.front()));
 
             if(human_should_move){
                 m_elevator.pause();
@@ -446,7 +471,7 @@ class ObjectManager{
             if(!elevator_moving && !m_humans.empty() && current_human.finished_moving)
             {
                 current_human.show();
-                current_human.move(0, dt);
+                current_human.move(0, dt, swap_direction(m_orders.front()));
                 if(!current_human.finished_moving)
                     m_humans.erase(m_humans.begin());
             }
