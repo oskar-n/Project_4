@@ -62,6 +62,10 @@ class Elevator
             m_y=y;
             m_color=color;
             m_rectangle.setPosition(m_x, m_y);
+            m_rectangle.setSize(sf::Vector2f(m_width, m_hight));
+            m_rectangle.setFillColor(m_color);
+            m_rectangle.setOutlineColor(sf::Color::Yellow);
+            m_rectangle.setOutlineThickness(5);
         }
 
         int get_x() const {
@@ -113,10 +117,6 @@ class Elevator
 
         void draw(sf::RenderWindow &window)
         {
-            m_rectangle.setSize(sf::Vector2f(m_width, m_hight));
-            m_rectangle.setFillColor(m_color);
-            m_rectangle.setOutlineColor(sf::Color::Yellow);
-            m_rectangle.setOutlineThickness(5);
             window.draw(m_rectangle);
         }
 
@@ -135,7 +135,7 @@ class Elevator
         }
 
         void pause(){
-            is_reached_beg=false;
+            m_should_move=false;
         }
         void start(){
             m_should_move=true;
@@ -258,7 +258,7 @@ inline Floors make_floors(int pos_x, sf::Color color){
 class Human{
     static sf::Texture m_texture;
     sf::Sprite m_sprite;
-    int m_speed = -10;
+    int m_speed = 10;
     bool m_startedmoving = false;
     bool m_should_appear = true;
 
@@ -284,20 +284,15 @@ class Human{
         set_pos(y);
     }
 
-    void flip_direction(){
-        m_speed = -m_speed;
-    }
-
     void set_pos(int y,int x=50){
         int m_x;
         if(FLOORS::FIRST==y || FLOORS::THIRD==y || FLOORS::FIFTH==y){
             m_x=x;
-            flip_direction(); // see swap_direction 
         }
         else{
-            x == 50 ? m_x=SCREEN_WIDTH-50-m_sprite.getGlobalBounds().width : m_x=x;
+            x == 50 ? m_x=SCREEN_WIDTH-50-m_sprite.getGlobalBounds().width*0.1 : m_x=x;
         }
-        int m_y=y+m_sprite.getGlobalBounds().height;
+        int m_y=y+m_sprite.getGlobalBounds().height*0.1;
         m_sprite.setPosition(m_x,m_y);
     }
 
@@ -307,17 +302,16 @@ class Human{
             std::cout<<"Error loading texture"<<std::endl;
         }
     }
-    bool move(int goal_x, double dt, bool swap_direction){
+    bool move(int goal_x, double dt){
         const auto human_x = m_sprite.getPosition().x;
         if(human_x == goal_x){
             finished_moving = true;
-            if(swap_direction){
-                flip_direction();
-                std::cout << "flipped" << std::endl;
-            }
             return false;
         }
-        m_sprite.move(m_speed*dt,0);
+        if(human_x < goal_x)
+            m_sprite.move(m_speed*dt,0);
+        else if (human_x > goal_x)
+            m_sprite.move(-m_speed*dt,0);
         rotate(dt);
         std::cout << "human_x: " << human_x << " goal: " << goal_x << std::endl;
         return true;
@@ -344,6 +338,17 @@ inline int get_boundry(FLOORS floor){
     }
     else{
         return SCREEN_WIDTH;
+    }
+}
+
+inline int find_border(int y){
+    switch(y) {
+        case FLOORS::FIRST: return 0;
+        case FLOORS::SECOND: return SCREEN_WIDTH;
+        case FLOORS::THIRD: return 0;
+        case FLOORS::FOURTH: return SCREEN_WIDTH;
+        case FLOORS::FIFTH: return 0;
+        default: return 0;
     }
 }
 
@@ -412,29 +417,9 @@ class ObjectManager{
         Human::load_texture();
     }
 
-    bool swap_direction(Move m){  //function handles if the direction should be swapped to avoid double swapping 
-        bool beg_is_right;
-        bool goal_is_right;
-        if(m.beg_floor==FLOORS::FOURTH || m.beg_floor==FLOORS::SECOND){
-            beg_is_right = true;
-        }
-        else beg_is_right = false;
-
-        if(m.goal_floor==FLOORS::FOURTH || m.goal_floor==FLOORS::SECOND){
-            goal_is_right = true;
-        }
-        else goal_is_right = false;
-
-        if(goal_is_right && beg_is_right)
-            return true;
-        if(!goal_is_right && beg_is_right)
-            return true;
-        else return false;
-
-
-    }
     //will be called once per frame
     void loop(){
+        bool human_droped_off = false;
         while (m_window.isOpen())
         {
             handle_events();
@@ -456,7 +441,7 @@ class ObjectManager{
                                                                  // so order of operations matters here
                                          !m_humans.empty()   && 
                                          !current_human.finished_moving&&
-                                          current_human.move(m_elevator.get_x(), dt, swap_direction(m_orders.front()));
+                                          current_human.move(m_elevator.get_x(), dt);
 
             if(human_should_move){
                 m_elevator.pause();
@@ -468,25 +453,25 @@ class ObjectManager{
                 m_elevator.start();
             }
            
-            if(!elevator_moving && !m_humans.empty() && current_human.finished_moving)
-            {
+            if(human_droped_off){
+                std::cerr << "human droped off" << std::endl;
                 current_human.show();
-                current_human.move(0, dt, swap_direction(m_orders.front()));
-                if(!current_human.finished_moving)
+                if(!current_human.move(find_border(m_elevator.get_y()), dt)){
                     m_humans.erase(m_humans.begin());
+                    human_droped_off = false;
+                }
             }
 
 
             if (elevator_reached_goal) 
             {
                 current_human.set_pos(m_elevator.get_y(), m_elevator.get_x());
+                human_droped_off = true;
                 if(m_elevator.should_move()) 
                 {
                     m_elevator.is_reached_beg =false;
                     m_elevator.is_reached_goal=false;
                     m_orders.pop();
-                    // m_humans.erase(m_humans.begin());
-                    // std::cout << "human deleted" << std::endl;
                 }
             }
             m_window.clear(sf::Color::White);
