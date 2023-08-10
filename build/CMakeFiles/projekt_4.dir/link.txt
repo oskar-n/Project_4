@@ -1,0 +1,1 @@
+/usr/bin/c++  -g CMakeFiles/projekt_4.dir/main.cpp.o -o projekt_4   -L/home/hubert/projects/Project_4/SFML/lib  -Wl,-rpath,/home/hubert/projects/Project_4/SFML/lib -lsfml-graphics -lsfml-audio -lsfml-window -lsfml-system 

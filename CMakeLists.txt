@@ -1,13 +1,15 @@
 cmake_minimum_required(VERSION 3.8)
 project(projekt_4)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+
 set(CMAKE_CXX_STANDARD 20)
 
 set(SFML_INCLUDE_DIR "SFML/include")
 
 set(SFML_LIBRARY_DIR "SFML/lib")
 
-set(SFML_LIBRARIES sfml-graphics sfml-window sfml-system)
+set(SFML_LIBRARIES sfml-graphics sfml-audio sfml-window sfml-system)
 
 include_directories(${SFML_INCLUDE_DIR})
 
