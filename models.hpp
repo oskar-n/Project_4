@@ -10,6 +10,9 @@ constexpr int BUTTON_WIDTH   =50;
 constexpr int ELEVATOR_WIDTH =290;
 constexpr int ELEVATOR_HIGHT =190;
 constexpr int FLOOR_HIGHT =40;
+constexpr int COUNTER_WIDTH = 200;
+constexpr int COUNTER_HIGHT = 50;
+constexpr int HUMAN_WEIGHT = 70;
 
 template <typename T>
 concept Container = requires(T t) {
@@ -290,9 +293,9 @@ class Human{
             m_x=x;
         }
         else{
-            x == 50 ? m_x=SCREEN_WIDTH-50-m_sprite.getGlobalBounds().width*0.1 : m_x=x;
+            x == 50 ? m_x=SCREEN_WIDTH-50-m_sprite.getGlobalBounds().width : m_x=x;
         }
-        int m_y=y+m_sprite.getGlobalBounds().height*0.1;
+        int m_y=y+m_sprite.getGlobalBounds().height;
         m_sprite.setPosition(m_x,m_y);
     }
 
@@ -332,6 +335,54 @@ class Human{
     }
 };
 
+class Counter{
+    private:
+    int m_pos_x;
+    int m_pos_y;
+    int m_width=COUNTER_WIDTH;
+    int m_hight=COUNTER_HIGHT;
+    sf::Color m_color;
+    sf::RectangleShape m_rectangle;
+    sf::Text m_text;
+    sf::Font m_font;
+    int m_count = 0;
+
+    public:
+    Counter(int pos_x, int pos_y, sf::Color color)
+        {
+            m_pos_x=pos_x;
+            m_pos_y=pos_y;
+            m_color=color;
+            m_rectangle.setSize(sf::Vector2f(m_width, m_hight));
+            if (!m_font.loadFromFile("digital-7.ttf"))
+            {
+                std::cout<<"Error loading font"<<std::endl;
+            }
+            m_text.setFont(m_font);
+            m_text.setCharacterSize(50);
+            m_text.setFillColor(sf::Color::White);
+        } 
+    
+    void draw(sf::RenderWindow &window)
+    {
+        m_text.setString(std::to_string(m_count));
+        m_rectangle.setFillColor(m_color);
+        m_rectangle.setPosition(m_pos_x, m_pos_y);
+        m_text.setPosition(m_pos_x+m_width/2, m_pos_y-10);
+        window.draw(m_rectangle);
+        window.draw(m_text);
+    }
+    void increment(){
+        m_count=m_count+HUMAN_WEIGHT;
+    }
+    void decrement(){
+        m_count=m_count-HUMAN_WEIGHT;
+    }
+    int get_count(){
+        return m_count;
+    }
+};
+
 inline int get_boundry(FLOORS floor){
     if(FLOORS::FIRST==floor || FLOORS::THIRD==floor || FLOORS::FIFTH==floor){
         return 0;
@@ -362,11 +413,12 @@ class ObjectManager{
         make_buttons(50, FLOORS::FIFTH,sf::Color::Red)
     };
     Floors m_floors = make_floors(0, sf::Color::Green);
+    Counter m_counter{SCREEN_WIDTH-COUNTER_WIDTH, 0, sf::Color::Blue};
     sf::RenderWindow m_window{sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Elevator"};
     std::queue<Move> m_orders{};
     std::vector<Human> m_humans{};
     const double dt = 0.1;
-
+    bool human_entered = false;
     void buttongr_pressed(Buttongroup &bg){
         for (auto &b : bg)
         {
@@ -449,10 +501,14 @@ class ObjectManager{
             }
             else{
                  if(!m_humans.empty() && current_human.finished_moving)
-                    current_human.hide();
+                    {
+                        current_human.hide();
+                    }
                 m_elevator.start();
             }
-           
+           if( !elevator_moving && !m_humans.empty() && current_human.finished_moving && !elevator_reached_goal && human_should_move) //  problem with adding the human
+           m_counter.increment();
+
             if(human_droped_off){
                 std::cerr << "human droped off" << std::endl;
                 current_human.show();
@@ -467,6 +523,7 @@ class ObjectManager{
             {
                 current_human.set_pos(m_elevator.get_y(), m_elevator.get_x());
                 human_droped_off = true;
+                m_counter.decrement();
                 if(m_elevator.should_move()) 
                 {
                     m_elevator.is_reached_beg =false;
@@ -475,7 +532,7 @@ class ObjectManager{
                 }
             }
             m_window.clear(sf::Color::White);
-            draw(m_window,m_elevator, m_buttongroups, m_floors, m_humans);
+            draw(m_window,m_elevator, m_buttongroups, m_floors, m_counter, m_humans);
             m_window.display();
         }
     }
