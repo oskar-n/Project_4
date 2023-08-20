@@ -1,0 +1,17 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/c++",
+      "-I/home/hubert/projects/Project_4/SFML/include",
+      "-g",
+      "-std=gnu++20",
+      "-c",
+      "-o",
+      "CMakeFiles/projekt_4.dir/main.cpp.o",
+      "/home/hubert/projects/Project_4/main.cpp"
+    ],
+    "directory": "/home/hubert/projects/Project_4/build",
+    "file": "/home/hubert/projects/Project_4/main.cpp",
+    "output": "/home/hubert/projects/Project_4/build/CMakeFiles/projekt_4.dir/main.cpp.o"
+  }
+]

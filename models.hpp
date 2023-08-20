@@ -3,6 +3,7 @@
 #include <queue>
 #include <array>
 #include <list>
+#include <set>
 
 constexpr int SCREEN_WIDTH   =1500;
 constexpr int SCREEN_HEIGHT  =1200;
@@ -46,11 +47,17 @@ enum FLOORS{
     FIFTH=150,
 };
 
+enum class DIRECTION{
+    UP,
+    DOWN,
+    NONE
+};
+
 class Elevator
 {
     private:
         const int m_x=SCREEN_WIDTH/2 - ELEVATOR_WIDTH/2;
-        int m_y=0;
+        int m_destination=0;
         int m_width=ELEVATOR_WIDTH;
         int m_hight=ELEVATOR_HIGHT;
         bool m_is_moving=false;
@@ -62,9 +69,9 @@ class Elevator
         bool is_reached_goal=false;
         Elevator(int y, sf::Color color)
         {
-            m_y=y;
+            m_destination=y;
             m_color=color;
-            m_rectangle.setPosition(m_x, m_y);
+            m_rectangle.setPosition(m_x, m_destination);
             m_rectangle.setSize(sf::Vector2f(m_width, m_hight));
             m_rectangle.setFillColor(m_color);
             m_rectangle.setOutlineColor(sf::Color::Yellow);
@@ -80,27 +87,27 @@ class Elevator
             return m_rectangle.getPosition().y;
         }
 
-        bool moving ()
+        DIRECTION move ()
         {   
             if(m_should_move)
             {
-                if (m_rectangle.getPosition().y>m_y)
+                if (m_rectangle.getPosition().y>m_destination)
                 {
                     m_rectangle.move(0,-1);
+                    return DIRECTION::UP;
                 }
-                if (m_rectangle.getPosition().y<m_y)
+                if (m_rectangle.getPosition().y<m_destination)
                 {
                     m_rectangle.move(0,1);
+                    return DIRECTION::DOWN;
                 }
-                if(m_rectangle.getPosition().y == m_y)
+                if(m_rectangle.getPosition().y == m_destination)
                 {
                     m_is_moving=false;
-                    return false;
+                    return DIRECTION::NONE;
                 }
-                m_is_moving=true;
-                return true;
             }
-            return false;
+            return DIRECTION::NONE;
         }
 
         bool is_moving()
@@ -113,28 +120,14 @@ class Elevator
             return m_should_move;
         }
 
-        void set_pos(int y)
+        void set_destination(int y)
         {   
-            m_y=y;
+            m_destination=y;
         }
 
         void draw(sf::RenderWindow &window)
         {
             window.draw(m_rectangle);
-        }
-
-        void reach_check()
-        {
-            
-            if (m_rectangle.getPosition().y==m_y && is_reached_beg==true)
-            {
-                is_reached_goal=true;
-                
-            }
-            if (m_rectangle.getPosition().y==m_y)
-            {
-                is_reached_beg=true;
-            }
         }
 
         void pause(){
@@ -203,6 +196,22 @@ struct Move{
     int beg_floor;
     int goal_floor;
     Button &b;
+
+    Move& operator = (Move const &other){
+        beg_floor = other.beg_floor;
+        goal_floor = other.goal_floor;
+        b = other.b;
+        return *this;
+    }
+
+    const Move& operator=(Move const &other) const {
+        if (this != &other) {
+            const_cast<Move*>(this)->beg_floor = other.beg_floor;
+            const_cast<Move*>(this)->goal_floor = other.goal_floor;
+            const_cast<Move*>(this)->b = other.b;
+        }
+        return *this;
+    }
 };
 
 
@@ -403,6 +412,78 @@ inline int find_border(int y){
     }
 }
 
+//TODO: Remove
+template<typename cont>
+void print(cont const &C){
+    for(auto i : C){
+        std::cerr << i.beg_floor << " ";
+    }
+    std::cerr << std::endl;
+}
+
+struct UniqueQueue{
+    std::deque <Move> m_path{};
+    std::set<int> m_visited_floors{};
+    void add_move(Move const &move){
+        auto [iter, inserted] = m_visited_floors.insert(move.beg_floor);
+        if(inserted){
+            m_path.push_back(move);
+        }
+    }
+    void remove_move(Move const &move){
+        m_visited_floors.erase(move.beg_floor);
+        m_path.pop_front();
+    }
+
+    auto begin() const{
+        return m_path.begin();
+    }
+
+    auto end()const{
+        return m_path.end();
+    }
+};
+
+struct ElevatorLogic{
+  Elevator &elevator;  
+  std::deque<Move> &orders;
+  std::vector<Human> &humans;
+  UniqueQueue m_path;
+  
+  void pick_up(){
+    //TODO
+  }
+  
+   void make_path(DIRECTION dir){
+        if(orders.empty()){
+            return;
+        }
+        auto &current_order = orders.front();
+        for(auto order : orders){
+            switch(dir){
+                case DIRECTION::UP:
+                    if(order.beg_floor <= current_order.beg_floor){
+                        m_path.add_move(order);
+                    }
+                    break;
+                case DIRECTION::DOWN:
+                    if(order.beg_floor >= current_order.beg_floor){
+                        m_path.add_move(order);
+                    }
+                    break;
+                case DIRECTION::NONE:
+                    break;
+            }
+        }
+        std::sort(m_path.begin(), m_path.end(), [](Move const &a, Move const &b){
+            return a.beg_floor < b.beg_floor;
+        });
+        //Debug:
+        std::cerr << "Path: ";
+        print(m_path);
+  }
+};
+
 class ObjectManager{
     Elevator m_elevator{FLOORS::FIRST, sf::Color::Blue};
     std::array<Buttongroup, 5> m_buttongroups = {
@@ -415,17 +496,22 @@ class ObjectManager{
     Floors m_floors = make_floors(0, sf::Color::Green);
     Counter m_counter{SCREEN_WIDTH-COUNTER_WIDTH, 0, sf::Color::Blue};
     sf::RenderWindow m_window{sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Elevator"};
-    std::queue<Move> m_orders{};
+    std::deque<Move> m_orders{};
     std::vector<Human> m_humans{};
+    ElevatorLogic m_elevLogic{m_elevator, m_orders, m_humans};
     const double dt = 0.1;
     bool human_entered = false;
+    DIRECTION dir = DIRECTION::NONE;
     void buttongr_pressed(Buttongroup &bg){
         for (auto &b : bg)
         {
             if (b.is_pressed(sf::Mouse::getPosition(m_window)))
             {
-                m_orders.push({b.m_beg, b.m_goal, b});
+                m_orders.push_back({b.m_beg, b.m_goal, b});
                 m_humans.emplace_back(Human(b.m_beg));
+                std::cerr<<"Orders";
+                print(m_orders);
+                m_elevLogic.make_path(DIRECTION::UP);
                 std::cout<<"human created"<<std::endl;
             }
         }    
@@ -449,21 +535,6 @@ class ObjectManager{
         }
     }
 
-    void handle_orders(){
-        if(!m_orders.empty())
-        {
-            if(m_elevator.is_reached_beg==false)
-            {
-                m_elevator.set_pos(m_orders.front().beg_floor);
-            }
-            else
-            {
-                m_elevator.set_pos(m_orders.front().goal_floor);
-            }
-            m_elevator.reach_check(); 
-        }
-    }
-
     //will be called once at the beginning
     void start(){
         Human::load_texture();
@@ -472,65 +543,11 @@ class ObjectManager{
     //will be called once per frame
     void loop(){
         bool human_droped_off = false;
+        dir = m_elevator.move();
         while (m_window.isOpen())
         {
             handle_events();
-            handle_orders();
 
-
-            auto &current_human = m_humans.front(); //can be a nullptr
-
-            bool elevator_moving = m_elevator.moving();
-            bool elevator_reached_beg  = !elevator_moving && // TODO: maybe unnecessary
-                                         !m_orders.empty()       && 
-                                          m_elevator.is_reached_beg;
-
-            bool elevator_reached_goal = !elevator_moving &&
-                                         !m_orders.empty()       && 
-                                          m_elevator.is_reached_goal;
-
-            bool human_should_move     = !elevator_moving    &&  // crazy stuff, if either of the 2 first conditions is true, the 3rd one is not checked. Checking it first would cause a segfault.
-                                                                 // so order of operations matters here
-                                         !m_humans.empty()   && 
-                                         !current_human.finished_moving&&
-                                          current_human.move(m_elevator.get_x(), dt);
-
-            if(human_should_move){
-                m_elevator.pause();
-                std::cout << "human should move" << std::endl;
-            }
-            else{
-                 if(!m_humans.empty() && current_human.finished_moving)
-                    {
-                        current_human.hide();
-                    }
-                m_elevator.start();
-            }
-           if( !elevator_moving && !m_humans.empty() && current_human.finished_moving && !elevator_reached_goal && human_should_move) //  problem with adding the human
-           m_counter.increment();
-
-            if(human_droped_off){
-                std::cerr << "human droped off" << std::endl;
-                current_human.show();
-                if(!current_human.move(find_border(m_elevator.get_y()), dt)){
-                    m_humans.erase(m_humans.begin());
-                    human_droped_off = false;
-                }
-            }
-
-
-            if (elevator_reached_goal) 
-            {
-                current_human.set_pos(m_elevator.get_y(), m_elevator.get_x());
-                human_droped_off = true;
-                m_counter.decrement();
-                if(m_elevator.should_move()) 
-                {
-                    m_elevator.is_reached_beg =false;
-                    m_elevator.is_reached_goal=false;
-                    m_orders.pop();
-                }
-            }
             m_window.clear(sf::Color::White);
             draw(m_window,m_elevator, m_buttongroups, m_floors, m_counter, m_humans);
             m_window.display();
