@@ -60,8 +60,6 @@ class Elevator
         int m_destination=0;
         int m_width=ELEVATOR_WIDTH;
         int m_hight=ELEVATOR_HIGHT;
-        bool m_is_moving=false;
-        bool m_should_move=true;
         sf::Color m_color;
         sf::RectangleShape m_rectangle;
     public:
@@ -89,35 +87,17 @@ class Elevator
 
         DIRECTION move ()
         {   
-            if(m_should_move)
+            if (m_rectangle.getPosition().y>m_destination)
             {
-                if (m_rectangle.getPosition().y>m_destination)
-                {
-                    m_rectangle.move(0,-1);
-                    return DIRECTION::UP;
-                }
-                if (m_rectangle.getPosition().y<m_destination)
-                {
-                    m_rectangle.move(0,1);
-                    return DIRECTION::DOWN;
-                }
-                if(m_rectangle.getPosition().y == m_destination)
-                {
-                    m_is_moving=false;
-                    return DIRECTION::NONE;
-                }
+                m_rectangle.move(0,-1);
+                return DIRECTION::UP;
             }
-            return DIRECTION::NONE;
-        }
-
-        bool is_moving()
-        {
-            return m_is_moving;
-        }
-
-        bool should_move()
-        {
-            return m_should_move;
+            if (m_rectangle.getPosition().y<m_destination)
+            {
+                m_rectangle.move(0,1);
+                return DIRECTION::DOWN;
+            }
+                return DIRECTION::NONE;
         }
 
         void set_destination(int y)
@@ -128,13 +108,6 @@ class Elevator
         void draw(sf::RenderWindow &window)
         {
             window.draw(m_rectangle);
-        }
-
-        void pause(){
-            m_should_move=false;
-        }
-        void start(){
-            m_should_move=true;
         }
 };
 
@@ -195,7 +168,7 @@ class Button{
 struct Move{
     int beg_floor;
     int goal_floor;
-    Button &b;
+    Button b;
 
     Move& operator = (Move const &other){
         beg_floor = other.beg_floor;
@@ -442,46 +415,88 @@ struct UniqueQueue{
     auto end()const{
         return m_path.end();
     }
+    
+    bool empty(){
+        return m_path.empty();
+    }
+
+    auto pop_front(){
+        m_visited_floors.erase(m_path.begin()->beg_floor);
+        m_path.pop_front();
+    }
 };
+
+inline DIRECTION get_dir(Move const &move){
+    if(move.beg_floor > move.goal_floor){
+        return DIRECTION::UP;
+    }
+    else if(move.beg_floor < move.goal_floor){
+        return DIRECTION::DOWN;
+    }
+    else{
+        return DIRECTION::NONE;
+    }
+}
 
 struct ElevatorLogic{
   Elevator &elevator;  
   std::deque<Move> &orders;
   std::vector<Human> &humans;
   UniqueQueue m_path;
+  Move const* m_final_move = nullptr;
+  DIRECTION current_dir = DIRECTION::NONE;
   
   void pick_up(){
     //TODO
   }
   
-   void make_path(DIRECTION dir){
+   void make_path(){
+       std::cerr << "Dir:"<<(int)current_dir << std::endl;
         if(orders.empty()){
             return;
         }
         auto &current_order = orders.front();
         for(auto order : orders){
-            switch(dir){
+            switch(current_dir){
                 case DIRECTION::UP:
-                    if(order.beg_floor <= current_order.beg_floor){
+                    if(order.beg_floor <= current_order.beg_floor && get_dir(order) == current_dir){
                         m_path.add_move(order);
                     }
                     break;
                 case DIRECTION::DOWN:
-                    if(order.beg_floor >= current_order.beg_floor){
+                    if(order.beg_floor >= current_order.beg_floor && get_dir(order) == current_dir){
                         m_path.add_move(order);
                     }
                     break;
                 case DIRECTION::NONE:
+                        if(m_path.empty())
+                            m_path.add_move(order);
                     break;
             }
         }
         std::sort(m_path.begin(), m_path.end(), [](Move const &a, Move const &b){
             return a.beg_floor < b.beg_floor;
         });
+        m_final_move = &*m_path.end();
         //Debug:
         std::cerr << "Path: ";
         print(m_path);
   }
+
+   void move(){
+       if(m_path.empty()) return;
+       static bool popped = false;
+       elevator.set_destination(m_path.begin()->beg_floor);
+       current_dir = elevator.move();
+       std::cerr << "Dir:"<<(int)current_dir << std::endl;
+       if(current_dir != DIRECTION::NONE){
+           popped = false;
+       }
+       if(current_dir == DIRECTION::NONE && !popped){
+           m_path.pop_front();
+           std::cerr << "Popped" << std::endl;
+       }
+   }
 };
 
 class ObjectManager{
@@ -501,7 +516,6 @@ class ObjectManager{
     ElevatorLogic m_elevLogic{m_elevator, m_orders, m_humans};
     const double dt = 0.1;
     bool human_entered = false;
-    DIRECTION dir = DIRECTION::NONE;
     void buttongr_pressed(Buttongroup &bg){
         for (auto &b : bg)
         {
@@ -511,7 +525,7 @@ class ObjectManager{
                 m_humans.emplace_back(Human(b.m_beg));
                 std::cerr<<"Orders";
                 print(m_orders);
-                m_elevLogic.make_path(DIRECTION::UP);
+                m_elevLogic.make_path();
                 std::cout<<"human created"<<std::endl;
             }
         }    
@@ -542,12 +556,10 @@ class ObjectManager{
 
     //will be called once per frame
     void loop(){
-        bool human_droped_off = false;
-        dir = m_elevator.move();
         while (m_window.isOpen())
         {
             handle_events();
-
+            m_elevLogic.move();
             m_window.clear(sf::Color::White);
             draw(m_window,m_elevator, m_buttongroups, m_floors, m_counter, m_humans);
             m_window.display();
