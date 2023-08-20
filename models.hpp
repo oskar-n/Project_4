@@ -57,7 +57,6 @@ class Elevator
 {
     private:
         const int m_x=SCREEN_WIDTH/2 - ELEVATOR_WIDTH/2;
-        int m_destination=0;
         int m_width=ELEVATOR_WIDTH;
         int m_hight=ELEVATOR_HIGHT;
         sf::Color m_color;
@@ -67,9 +66,8 @@ class Elevator
         bool is_reached_goal=false;
         Elevator(int y, sf::Color color)
         {
-            m_destination=y;
             m_color=color;
-            m_rectangle.setPosition(m_x, m_destination);
+            m_rectangle.setPosition(m_x, y);
             m_rectangle.setSize(sf::Vector2f(m_width, m_hight));
             m_rectangle.setFillColor(m_color);
             m_rectangle.setOutlineColor(sf::Color::Yellow);
@@ -85,24 +83,19 @@ class Elevator
             return m_rectangle.getPosition().y;
         }
 
-        DIRECTION move ()
+        DIRECTION move(int dest)
         {   
-            if (m_rectangle.getPosition().y>m_destination)
+            if (m_rectangle.getPosition().y>dest)
             {
                 m_rectangle.move(0,-1);
                 return DIRECTION::UP;
             }
-            if (m_rectangle.getPosition().y<m_destination)
+            if (m_rectangle.getPosition().y<dest)
             {
                 m_rectangle.move(0,1);
                 return DIRECTION::DOWN;
             }
                 return DIRECTION::NONE;
-        }
-
-        void set_destination(int y)
-        {   
-            m_destination=y;
         }
 
         void draw(sf::RenderWindow &window)
@@ -184,6 +177,10 @@ struct Move{
             const_cast<Move*>(this)->b = other.b;
         }
         return *this;
+    }
+
+    bool operator==(Move const &other) const{
+        return beg_floor == other.beg_floor && goal_floor == other.goal_floor;
     }
 };
 
@@ -443,7 +440,6 @@ struct ElevatorLogic{
   std::deque<Move> &orders;
   std::vector<Human> &humans;
   UniqueQueue m_path;
-  Move const* m_final_move = nullptr;
   DIRECTION current_dir = DIRECTION::NONE;
   
   void pick_up(){
@@ -477,7 +473,6 @@ struct ElevatorLogic{
         std::sort(m_path.begin(), m_path.end(), [](Move const &a, Move const &b){
             return a.beg_floor < b.beg_floor;
         });
-        m_final_move = &*m_path.end();
         //Debug:
         std::cerr << "Path: ";
         print(m_path);
@@ -486,16 +481,18 @@ struct ElevatorLogic{
    void move(){
        if(m_path.empty()) return;
        static bool popped = false;
-       elevator.set_destination(m_path.begin()->beg_floor);
-       current_dir = elevator.move();
-       std::cerr << "Dir:"<<(int)current_dir << std::endl;
-       if(current_dir != DIRECTION::NONE){
-           popped = false;
-       }
-       if(current_dir == DIRECTION::NONE && !popped){
-           m_path.pop_front();
-           std::cerr << "Popped" << std::endl;
-       }
+       bool ReachedGoal = false;
+       current_dir = elevator.move(m_path.begin()->beg_floor);
+
+       // if(current_dir != DIRECTION::NONE){
+       //     popped = false;
+       // }
+       // if(current_dir == DIRECTION::NONE && !popped){
+       //     auto order = m_path.begin();
+       //     auto order_in_path = std::find(orders.begin(), orders.end(), *order);
+       //     std::erase(orders, *order_in_path);
+       //     m_path.pop_front();
+       // }
    }
 };
 
