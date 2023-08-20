@@ -53,6 +53,30 @@ enum class DIRECTION{
     NONE
 };
 
+/*Kinda of a weird thing,if you want to return from a function a value, only once, until something changes, use this*/
+template<typename RETURN>
+struct Impulse{
+    bool &Rule;
+    RETURN Value;
+
+    RETURN get(){
+        static bool old_rule = Rule;
+
+        if(Rule != old_rule){
+            Rule= false;
+            return Value;
+        }
+        else {
+            return RETURN{};
+        }
+    }
+    Impulse& operator=(Impulse<RETURN> const &other){
+        Rule = other.Rule;
+        Value = other.Value;
+        return *this;
+    }
+};
+
 class Elevator
 {
     private:
@@ -61,7 +85,9 @@ class Elevator
         int m_hight=ELEVATOR_HIGHT;
         sf::Color m_color;
         sf::RectangleShape m_rectangle;
+        Impulse<DIRECTION> m_dir{m_Flag, DIRECTION::NONE};
     public:
+        bool m_Flag=false;
         bool is_reached_beg=false;
         bool is_reached_goal=false;
         Elevator(int y, sf::Color color)
@@ -83,19 +109,28 @@ class Elevator
             return m_rectangle.getPosition().y;
         }
 
-        DIRECTION move(int dest)
+        //Why like this ? Because the elevator should return DIRECTION::UP/DOWN once per iteration 
+        // But DIRECTION::NONE should be returned once, kinda a hacky way to do it
+        // The name flag, is umbiguous, that is on purpose, the value of it is not important, only the fact that it changes
+        Impulse<DIRECTION> move(int dest)
         {   
             if (m_rectangle.getPosition().y>dest)
             {
                 m_rectangle.move(0,-1);
-                return DIRECTION::UP;
+                m_dir.Value = DIRECTION::UP;
+                m_Flag=!m_Flag; 
+                return m_dir;
             }
             if (m_rectangle.getPosition().y<dest)
             {
                 m_rectangle.move(0,1);
-                return DIRECTION::DOWN;
+                m_Flag=!m_Flag;
+                m_dir.Value = DIRECTION::DOWN;
+                return m_dir;
             }
-                return DIRECTION::NONE;
+            m_Flag = true;
+            m_dir.Value = DIRECTION::NONE;
+            return m_dir;
         }
 
         void draw(sf::RenderWindow &window)
@@ -203,6 +238,7 @@ inline void draw_buttons(Buttongroup &buttons, sf::RenderWindow &window){
         b.draw(window);
     }
 }
+
 struct Floor {
     int m_width = (SCREEN_WIDTH-ELEVATOR_WIDTH-10)/2;
     int m_hight = FLOOR_HIGHT;
@@ -440,27 +476,29 @@ struct ElevatorLogic{
   std::deque<Move> &orders;
   std::vector<Human> &humans;
   UniqueQueue m_path;
-  DIRECTION current_dir = DIRECTION::NONE;
-  
+  Impulse<DIRECTION> current_dir;  
+  bool ReachedGoal = false;
+  bool ReachedBeg = false;
+
   void pick_up(){
     //TODO
   }
   
    void make_path(){
-       std::cerr << "Dir:"<<(int)current_dir << std::endl;
+       std::cerr << "Dir:"<<(int)current_dir.Value << std::endl;
         if(orders.empty()){
             return;
         }
         auto &current_order = orders.front();
         for(auto order : orders){
-            switch(current_dir){
+            switch(current_dir.get()){
                 case DIRECTION::UP:
-                    if(order.beg_floor <= current_order.beg_floor && get_dir(order) == current_dir){
+                    if(order.beg_floor <= current_order.beg_floor && get_dir(order) == current_dir.get()){
                         m_path.add_move(order);
                     }
                     break;
                 case DIRECTION::DOWN:
-                    if(order.beg_floor >= current_order.beg_floor && get_dir(order) == current_dir){
+                    if(order.beg_floor >= current_order.beg_floor && get_dir(order) == current_dir.get()){
                         m_path.add_move(order);
                     }
                     break;
@@ -481,18 +519,28 @@ struct ElevatorLogic{
    void move(){
        if(m_path.empty()) return;
        static bool popped = false;
-       bool ReachedGoal = false;
-       current_dir = elevator.move(m_path.begin()->beg_floor);
-
-       // if(current_dir != DIRECTION::NONE){
-       //     popped = false;
-       // }
-       // if(current_dir == DIRECTION::NONE && !popped){
-       //     auto order = m_path.begin();
-       //     auto order_in_path = std::find(orders.begin(), orders.end(), *order);
-       //     std::erase(orders, *order_in_path);
-       //     m_path.pop_front();
-       // }
+       if(!ReachedBeg)
+       {
+           current_dir = elevator.move(m_path.begin()->beg_floor);
+           if(current_dir.get() == DIRECTION::NONE){
+               ReachedBeg = true;
+           }
+       }
+       else 
+       {
+           current_dir = elevator.move(m_path.begin()->goal_floor);
+           if(current_dir.get() == DIRECTION::NONE){
+               ReachedGoal = true;
+           }
+       }
+       if(ReachedBeg && ReachedGoal){
+           auto order = m_path.begin();
+           auto order_in_path = std::find(orders.begin(), orders.end(), *order);
+           ReachedBeg = false;
+           ReachedGoal = false;
+           std::erase(orders, *order_in_path);
+           m_path.pop_front();
+       }
    }
 };
 
@@ -510,7 +558,7 @@ class ObjectManager{
     sf::RenderWindow m_window{sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Elevator"};
     std::deque<Move> m_orders{};
     std::vector<Human> m_humans{};
-    ElevatorLogic m_elevLogic{m_elevator, m_orders, m_humans};
+    ElevatorLogic m_elevLogic{m_elevator, m_orders, m_humans, UniqueQueue{}, Impulse<DIRECTION>{m_elevator.m_Flag, DIRECTION::NONE}};
     const double dt = 0.1;
     bool human_entered = false;
     void buttongr_pressed(Buttongroup &bg){
