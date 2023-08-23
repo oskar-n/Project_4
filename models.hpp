@@ -3,7 +3,10 @@
 #include <queue>
 #include <array>
 #include <list>
-#include <set>
+#include <ranges>
+#include <map>
+#include "utils.hpp"
+#include <unordered_map>
 
 constexpr int SCREEN_WIDTH   =1500;
 constexpr int SCREEN_HEIGHT  =1200;
@@ -24,6 +27,15 @@ concept Container = requires(T t) {
 template <typename T>
 void draw(T &Object, sf::RenderWindow &window){
     Object.draw(window);
+}
+
+template <typename Key, typename Val>
+void draw(std::unordered_map<Key,Val> &Object_cont, sf::RenderWindow &window){
+    for (auto &[key,value]: Object_cont)
+    {
+        // Dereference and draw the value
+        draw(value, window);
+    }
 }
 
 template <Container C>
@@ -47,53 +59,26 @@ enum FLOORS{
     FIFTH=150,
 };
 
-enum class DIRECTION{
-    UP,
-    DOWN,
-    NONE
-};
-
-/*Kinda of a weird thing,if you want to return from a function a value, only once, until something changes, use this*/
-template<typename RETURN>
-struct Impulse{
-    bool &Rule;
-    RETURN Value;
-
-    RETURN get(){
-        static bool old_rule = Rule;
-
-        if(Rule != old_rule){
-            Rule= false;
-            return Value;
-        }
-        else {
-            return RETURN{};
-        }
-    }
-    Impulse& operator=(Impulse<RETURN> const &other){
-        Rule = other.Rule;
-        Value = other.Value;
-        return *this;
-    }
-};
-
 class Elevator
 {
     private:
         const int m_x=SCREEN_WIDTH/2 - ELEVATOR_WIDTH/2;
+        int m_y=0;
         int m_width=ELEVATOR_WIDTH;
         int m_hight=ELEVATOR_HIGHT;
+        bool m_is_moving=false;
+        bool m_should_move=true;
         sf::Color m_color;
         sf::RectangleShape m_rectangle;
-        Impulse<DIRECTION> m_dir{m_Flag, DIRECTION::NONE};
+        UniqueQueue<FLOORS> m_path;
     public:
-        bool m_Flag=false;
         bool is_reached_beg=false;
         bool is_reached_goal=false;
         Elevator(int y, sf::Color color)
         {
+            m_y=y;
             m_color=color;
-            m_rectangle.setPosition(m_x, y);
+            m_rectangle.setPosition(m_x, m_y);
             m_rectangle.setSize(sf::Vector2f(m_width, m_hight));
             m_rectangle.setFillColor(m_color);
             m_rectangle.setOutlineColor(sf::Color::Yellow);
@@ -104,38 +89,92 @@ class Elevator
             return m_x;
         }
 
+        void move_next(){
+            if(m_path.size() > 0){
+                m_y = m_path[0];
+                m_path.pop_front();
+            }
+        }
+
+        void add_to_path(FLOORS floor){
+            if(m_path.add(floor))
+            {
+                std::cout << "added to path" << std::endl;
+            }
+            //Debug
+            for(auto i : m_path){
+                std::cout << i << std::endl;
+            }
+            std::sort(m_path.begin(), m_path.end());
+        }
+
         int get_y() const
         {
             return m_rectangle.getPosition().y;
         }
 
-        //Why like this ? Because the elevator should return DIRECTION::UP/DOWN once per iteration 
-        // But DIRECTION::NONE should be returned once, kinda a hacky way to do it
-        // The name flag, is umbiguous, that is on purpose, the value of it is not important, only the fact that it changes
-        Impulse<DIRECTION> move(int dest)
+        bool moving ()
         {   
-            if (m_rectangle.getPosition().y>dest)
+            if(m_should_move)
             {
-                m_rectangle.move(0,-1);
-                m_dir.Value = DIRECTION::UP;
-                m_Flag=!m_Flag; 
-                return m_dir;
+                if (m_rectangle.getPosition().y>m_y)
+                {
+                    m_rectangle.move(0,-1);
+                }
+                if (m_rectangle.getPosition().y<m_y)
+                {
+                    m_rectangle.move(0,1);
+                }
+                if(m_rectangle.getPosition().y == m_y)
+                {
+                    m_is_moving=false;
+                    return false;
+                }
+                m_is_moving=true;
+                return true;
             }
-            if (m_rectangle.getPosition().y<dest)
-            {
-                m_rectangle.move(0,1);
-                m_Flag=!m_Flag;
-                m_dir.Value = DIRECTION::DOWN;
-                return m_dir;
-            }
-            m_Flag = true;
-            m_dir.Value = DIRECTION::NONE;
-            return m_dir;
+            return false;
+        }
+
+        bool is_moving()
+        {
+            return m_is_moving;
+        }
+
+        bool should_move()
+        {
+            return m_should_move;
+        }
+
+        void set_pos(int y)
+        {   
+            m_y=y;
         }
 
         void draw(sf::RenderWindow &window)
         {
             window.draw(m_rectangle);
+        }
+
+        void reach_check()
+        {
+            
+            if (m_rectangle.getPosition().y==m_y && is_reached_beg==true)
+            {
+                is_reached_goal=true;
+                
+            }
+            if (m_rectangle.getPosition().y==m_y)
+            {
+                is_reached_beg=true;
+            }
+        }
+
+        void pause(){
+            m_should_move=false;
+        }
+        void start(){
+            m_should_move=true;
         }
 };
 
@@ -149,8 +188,8 @@ class Button{
         sf::Text m_text;
         sf::Font m_font;
     public:
-        int m_beg;
-        int m_goal;
+        int m_beg = 0;
+        int m_goal = 0;
         Button(int pos_x, int pos_y, int goal, sf::Color color,  char num)
         {
             m_pos_x=pos_x;
@@ -167,6 +206,9 @@ class Button{
             m_text.setCharacterSize(50);
             m_text.setFillColor(sf::Color::White);
             m_text.setString(num);
+            m_rectangle.setFillColor(m_color);
+            m_rectangle.setPosition(m_pos_x, m_pos_y);
+            m_text.setPosition(m_pos_x+m_width/2, m_pos_y-10);
         }
 
         void make_red(){
@@ -175,9 +217,6 @@ class Button{
 
         void draw(sf::RenderWindow &window)
         {
-            m_rectangle.setFillColor(m_color);
-            m_rectangle.setPosition(m_pos_x, m_pos_y);
-            m_text.setPosition(m_pos_x+m_width/2, m_pos_y-10);
             window.draw(m_rectangle);
             window.draw(m_text);
         }
@@ -196,80 +235,20 @@ class Button{
 struct Move{
     int beg_floor;
     int goal_floor;
-    Button b;
-
-    Move& operator = (Move const &other){
-        beg_floor = other.beg_floor;
-        goal_floor = other.goal_floor;
-        b = other.b;
-        return *this;
-    }
-
-    const Move& operator=(Move const &other) const {
-        if (this != &other) {
-            const_cast<Move*>(this)->beg_floor = other.beg_floor;
-            const_cast<Move*>(this)->goal_floor = other.goal_floor;
-            const_cast<Move*>(this)->b = other.b;
-        }
-        return *this;
-    }
-
-    bool operator==(Move const &other) const{
-        return beg_floor == other.beg_floor && goal_floor == other.goal_floor;
-    }
+    Button &b;
 };
 
 
 using Buttongroup = std::array<Button, 5>; 
 
-inline Buttongroup make_buttons(int pos_x, int pos_y, sf::Color color){
+inline Buttongroup make_buttons(int pos_x, FLOORS floor, sf::Color color){
+
     return Buttongroup{
-        Button(pos_x, pos_y, FLOORS::FIRST, color, '1'),
-        Button(pos_x + BUTTON_WIDTH, pos_y, FLOORS::SECOND, color, '2'),
-        Button(pos_x + BUTTON_WIDTH * 2, pos_y, FLOORS::THIRD, color, '3'),
-        Button(pos_x + BUTTON_WIDTH * 3, pos_y, FLOORS::FOURTH, color, '4'),
-        Button(pos_x + BUTTON_WIDTH * 4, pos_y, FLOORS::FIFTH, color, '5')
-    };
-}
-
-inline void draw_buttons(Buttongroup &buttons, sf::RenderWindow &window){
-    for (auto &b : buttons)
-    {
-        b.draw(window);
-    }
-}
-
-struct Floor {
-    int m_width = (SCREEN_WIDTH-ELEVATOR_WIDTH-10)/2;
-    int m_hight = FLOOR_HIGHT;
-    bool is_left;
-    int m_pos_x;
-    FLOORS m_pos_y;
-    sf::RectangleShape rectangle;
-    sf::Color color;
-    Floor(int pos_x, FLOORS pos_y, sf::Color color, bool is_left) : m_pos_x(pos_x), m_pos_y(pos_y), color(color), is_left(is_left) {
-        rectangle.setSize(sf::Vector2f(m_width, m_hight));
-        rectangle.setFillColor(color);
-        rectangle.setOutlineColor(sf::Color::Yellow);
-        rectangle.setOutlineThickness(5);
-        if(is_left)rectangle.setPosition(m_pos_x, m_pos_y+ELEVATOR_HIGHT);
-        else rectangle.setPosition(SCREEN_WIDTH-m_pos_x-m_width, m_pos_y+ELEVATOR_HIGHT);
-    }
-
-    void draw(sf::RenderWindow &window){
-        window.draw(rectangle);
-    }
-};
-
-using Floors = std::array<Floor, 5>;
-
-inline Floors make_floors(int pos_x, sf::Color color){
-    return {
-        Floor(pos_x, FLOORS::FIRST, color, true),
-        Floor(pos_x, FLOORS::SECOND, color, false),
-        Floor(pos_x, FLOORS::THIRD, color, true),
-        Floor(pos_x, FLOORS::FOURTH, color, false),
-        Floor(pos_x, FLOORS::FIFTH, color, true)
+        Button(pos_x, floor, FLOORS::FIRST, color, '1'),
+        Button(pos_x + BUTTON_WIDTH, floor, FLOORS::SECOND, color, '2'),
+        Button(pos_x + BUTTON_WIDTH * 2, floor, FLOORS::THIRD, color, '3'),
+        Button(pos_x + BUTTON_WIDTH * 3, floor, FLOORS::FOURTH, color, '4'),
+        Button(pos_x + BUTTON_WIDTH * 4, floor, FLOORS::FIFTH, color, '5')
     };
 }
 
@@ -292,11 +271,12 @@ class Human{
         m_startedmoving = true;
     }
 
-
     public:
     bool finished_moving = false;
+    int m_goal;
+    int m_beg;
 
-    Human(int y){
+    Human(int y, int goal) : m_goal(goal), m_beg(y){
         m_sprite.setTexture(m_texture);
         m_sprite.setScale(0.1,0.1);
         set_pos(y);
@@ -331,7 +311,7 @@ class Human{
         else if (human_x > goal_x)
             m_sprite.move(-m_speed*dt,0);
         rotate(dt);
-        std::cout << "human_x: " << human_x << " goal: " << goal_x << std::endl;
+        // std::cout << "human_x: " << human_x << " goal: " << goal_x << std::endl;
         return true;
     }
 
@@ -350,53 +330,43 @@ class Human{
     }
 };
 
-class Counter{
-    private:
+struct Floor {
+    int m_width = (SCREEN_WIDTH-ELEVATOR_WIDTH-10)/2;
+    int m_hight = FLOOR_HIGHT;
+    bool is_left;
     int m_pos_x;
-    int m_pos_y;
-    int m_width=COUNTER_WIDTH;
-    int m_hight=COUNTER_HIGHT;
-    sf::Color m_color;
-    sf::RectangleShape m_rectangle;
-    sf::Text m_text;
-    sf::Font m_font;
-    int m_count = 0;
+    FLOORS m_pos_y;
+    sf::RectangleShape rectangle;
+    sf::Color color;
+    std::vector<Human> m_humans;
+    Floor(int pos_x, FLOORS pos_y, sf::Color color, bool is_left) : m_pos_x(pos_x), m_pos_y(pos_y), color(color), is_left(is_left) {
+        rectangle.setSize(sf::Vector2f(m_width, m_hight));
+        rectangle.setFillColor(color);
+        rectangle.setOutlineColor(sf::Color::Yellow);
+        rectangle.setOutlineThickness(5);
+        if(is_left)rectangle.setPosition(m_pos_x, m_pos_y+ELEVATOR_HIGHT);
+        else rectangle.setPosition(SCREEN_WIDTH-m_pos_x-m_width, m_pos_y+ELEVATOR_HIGHT);
+    }
 
-    public:
-    Counter(int pos_x, int pos_y, sf::Color color)
-        {
-            m_pos_x=pos_x;
-            m_pos_y=pos_y;
-            m_color=color;
-            m_rectangle.setSize(sf::Vector2f(m_width, m_hight));
-            if (!m_font.loadFromFile("digital-7.ttf"))
-            {
-                std::cout<<"Error loading font"<<std::endl;
-            }
-            m_text.setFont(m_font);
-            m_text.setCharacterSize(50);
-            m_text.setFillColor(sf::Color::White);
-        } 
-    
-    void draw(sf::RenderWindow &window)
-    {
-        m_text.setString(std::to_string(m_count));
-        m_rectangle.setFillColor(m_color);
-        m_rectangle.setPosition(m_pos_x, m_pos_y);
-        m_text.setPosition(m_pos_x+m_width/2, m_pos_y-10);
-        window.draw(m_rectangle);
-        window.draw(m_text);
-    }
-    void increment(){
-        m_count=m_count+HUMAN_WEIGHT;
-    }
-    void decrement(){
-        m_count=m_count-HUMAN_WEIGHT;
-    }
-    int get_count(){
-        return m_count;
+    void draw(sf::RenderWindow &window){
+        for(auto &human : m_humans){
+            human.draw(window);
+        }
+        window.draw(rectangle);
     }
 };
+
+using Floors = std::unordered_map<FLOORS, Floor>;
+
+inline Floors make_floors(int pos_x, sf::Color color){
+    return Floors{
+        {FLOORS::FIRST, Floor(pos_x, FLOORS::FIRST, color, true)},
+        {FLOORS::SECOND, Floor(pos_x, FLOORS::SECOND, color, false)},
+        {FLOORS::THIRD, Floor(pos_x, FLOORS::THIRD, color, true)},
+        {FLOORS::FOURTH, Floor(pos_x, FLOORS::FOURTH, color, false)},
+        {FLOORS::FIFTH, Floor(pos_x, FLOORS::FIFTH, color, true)}
+    };
+}
 
 inline int get_boundry(FLOORS floor){
     if(FLOORS::FIRST==floor || FLOORS::THIRD==floor || FLOORS::FIFTH==floor){
@@ -418,132 +388,6 @@ inline int find_border(int y){
     }
 }
 
-//TODO: Remove
-template<typename cont>
-void print(cont const &C){
-    for(auto i : C){
-        std::cerr << i.beg_floor << " ";
-    }
-    std::cerr << std::endl;
-}
-
-struct UniqueQueue{
-    std::deque <Move> m_path{};
-    std::set<int> m_visited_floors{};
-    void add_move(Move const &move){
-        auto [iter, inserted] = m_visited_floors.insert(move.beg_floor);
-        if(inserted){
-            m_path.push_back(move);
-        }
-    }
-    void remove_move(Move const &move){
-        m_visited_floors.erase(move.beg_floor);
-        m_path.pop_front();
-    }
-
-    auto begin() const{
-        return m_path.begin();
-    }
-
-    auto end()const{
-        return m_path.end();
-    }
-    
-    bool empty(){
-        return m_path.empty();
-    }
-
-    auto pop_front(){
-        m_visited_floors.erase(m_path.begin()->beg_floor);
-        m_path.pop_front();
-    }
-};
-
-inline DIRECTION get_dir(Move const &move){
-    if(move.beg_floor > move.goal_floor){
-        return DIRECTION::UP;
-    }
-    else if(move.beg_floor < move.goal_floor){
-        return DIRECTION::DOWN;
-    }
-    else{
-        return DIRECTION::NONE;
-    }
-}
-
-struct ElevatorLogic{
-  Elevator &elevator;  
-  std::deque<Move> &orders;
-  std::vector<Human> &humans;
-  UniqueQueue m_path;
-  Impulse<DIRECTION> current_dir;  
-  bool ReachedGoal = false;
-  bool ReachedBeg = false;
-
-  void pick_up(){
-    //TODO
-  }
-  
-   void make_path(){
-       std::cerr << "Dir:"<<(int)current_dir.Value << std::endl;
-        if(orders.empty()){
-            return;
-        }
-        auto &current_order = orders.front();
-        for(auto order : orders){
-            switch(current_dir.get()){
-                case DIRECTION::UP:
-                    if(order.beg_floor <= current_order.beg_floor && get_dir(order) == current_dir.get()){
-                        m_path.add_move(order);
-                    }
-                    break;
-                case DIRECTION::DOWN:
-                    if(order.beg_floor >= current_order.beg_floor && get_dir(order) == current_dir.get()){
-                        m_path.add_move(order);
-                    }
-                    break;
-                case DIRECTION::NONE:
-                        if(m_path.empty())
-                            m_path.add_move(order);
-                    break;
-            }
-        }
-        std::sort(m_path.begin(), m_path.end(), [](Move const &a, Move const &b){
-            return a.beg_floor < b.beg_floor;
-        });
-        //Debug:
-        std::cerr << "Path: ";
-        print(m_path);
-  }
-
-   void move(){
-       if(m_path.empty()) return;
-       static bool popped = false;
-       if(!ReachedBeg)
-       {
-           current_dir = elevator.move(m_path.begin()->beg_floor);
-           if(current_dir.get() == DIRECTION::NONE){
-               ReachedBeg = true;
-           }
-       }
-       else 
-       {
-           current_dir = elevator.move(m_path.begin()->goal_floor);
-           if(current_dir.get() == DIRECTION::NONE){
-               ReachedGoal = true;
-           }
-       }
-       if(ReachedBeg && ReachedGoal){
-           auto order = m_path.begin();
-           auto order_in_path = std::find(orders.begin(), orders.end(), *order);
-           ReachedBeg = false;
-           ReachedGoal = false;
-           std::erase(orders, *order_in_path);
-           m_path.pop_front();
-       }
-   }
-};
-
 class ObjectManager{
     Elevator m_elevator{FLOORS::FIRST, sf::Color::Blue};
     std::array<Buttongroup, 5> m_buttongroups = {
@@ -554,24 +398,22 @@ class ObjectManager{
         make_buttons(50, FLOORS::FIFTH,sf::Color::Red)
     };
     Floors m_floors = make_floors(0, sf::Color::Green);
-    Counter m_counter{SCREEN_WIDTH-COUNTER_WIDTH, 0, sf::Color::Blue};
     sf::RenderWindow m_window{sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Elevator"};
-    std::deque<Move> m_orders{};
-    std::vector<Human> m_humans{};
-    ElevatorLogic m_elevLogic{m_elevator, m_orders, m_humans, UniqueQueue{}, Impulse<DIRECTION>{m_elevator.m_Flag, DIRECTION::NONE}};
     const double dt = 0.1;
     bool human_entered = false;
+
+    void spawn_human(FLOORS Beg, FLOORS goal){
+        m_elevator.add_to_path(Beg);
+        m_floors.at(Beg).m_humans.emplace_back((int)Beg,(int)goal);
+    }
+
     void buttongr_pressed(Buttongroup &bg){
         for (auto &b : bg)
         {
             if (b.is_pressed(sf::Mouse::getPosition(m_window)))
             {
-                m_orders.push_back({b.m_beg, b.m_goal, b});
-                m_humans.emplace_back(Human(b.m_beg));
-                std::cerr<<"Orders";
-                print(m_orders);
-                m_elevLogic.make_path();
                 std::cout<<"human created"<<std::endl;
+                    spawn_human((FLOORS)b.m_beg, (FLOORS)b.m_goal);
             }
         }    
     }
@@ -599,15 +441,33 @@ class ObjectManager{
         Human::load_texture();
     }
 
+    bool pick_up(FLOORS floor){
+        auto &humans = m_floors.at(floor).m_humans;
+        if(humans.empty()) return false;
+        auto &human = humans.front();
+        if(human.move(m_elevator.get_x(), dt*0.5)){
+            m_elevator.add_to_path((FLOORS)human.m_goal);
+            return true;
+        }
+        else{
+            return false;
+        }
+
+    }
     //will be called once per frame
     void loop(){
         while (m_window.isOpen())
         {
+
             handle_events();
-            m_elevLogic.move();
+            if(!m_elevator.moving()){
+                while(pick_up((FLOORS)m_elevator.get_y()));
+                m_elevator.move_next();
+            }
             m_window.clear(sf::Color::White);
-            draw(m_window,m_elevator, m_buttongroups, m_floors, m_counter, m_humans);
+            draw(m_window,m_elevator,m_buttongroups, m_floors);
             m_window.display();
         }
     }
 };
+
