@@ -7,6 +7,7 @@
 #include <map>
 #include "utils.hpp"
 #include <unordered_map>
+#include <utility>
 
 constexpr int SCREEN_WIDTH   =1500;
 constexpr int SCREEN_HEIGHT  =1200;
@@ -59,6 +60,85 @@ enum FLOORS{
     FIFTH=150,
 };
 
+
+class Human{
+    static sf::Texture m_texture;
+    sf::Sprite m_sprite;
+    int m_speed = 10;
+    bool m_startedmoving = false;
+    bool m_should_appear = true;
+
+    void rotate(double dt){
+        static int angle = 30;
+        if(!m_startedmoving){
+            m_sprite.rotate(angle*dt);
+        }
+        else{
+            m_sprite.rotate(2*angle*dt);
+        }
+        angle = -angle;
+        m_startedmoving = true;
+    }
+
+    public:
+    bool finished_moving = false;
+    int m_goal;
+    int m_beg;
+
+    Human(int y, int goal) : m_goal(goal), m_beg(y){
+        m_sprite.setTexture(m_texture);
+        m_sprite.setScale(0.1,0.1);
+        set_pos(y);
+    }
+
+    void set_pos(int y,int x=50){
+        int m_x;
+        if(FLOORS::FIRST==y || FLOORS::THIRD==y || FLOORS::FIFTH==y){
+            m_x=x;
+        }
+        else{
+            x == 50 ? m_x=SCREEN_WIDTH-50-m_sprite.getGlobalBounds().width : m_x=x;
+        }
+        int m_y=y+m_sprite.getGlobalBounds().height;
+        m_sprite.setPosition(m_x,m_y);
+    }
+
+    static void load_texture(){
+        if (!m_texture.loadFromFile("human.png"))
+        {
+            std::cout<<"Error loading texture"<<std::endl;
+        }
+    }
+    bool move(int goal_x, double dt){
+        const auto human_x = m_sprite.getPosition().x;
+        if(human_x == goal_x){
+            finished_moving = true;
+            return false;
+        }
+        if(human_x < goal_x)
+            m_sprite.move(m_speed*dt,0);
+        else if (human_x > goal_x)
+            m_sprite.move(-m_speed*dt,0);
+        rotate(dt);
+        // std::cout << "human_x: " << human_x << " goal: " << goal_x << std::endl;
+        return true;
+    }
+
+    void hide() {
+        m_should_appear = false;
+    }
+
+
+    void show(){
+        m_should_appear = true;
+    }
+
+    void draw(sf::RenderWindow &window) const {
+        if(m_should_appear)
+            window.draw(m_sprite);
+    }
+};
+
 class Elevator
 {
     private:
@@ -73,6 +153,7 @@ class Elevator
         UniqueQueue<FLOORS> m_path;
     public:
         bool is_reached_beg=false;
+        std::vector<Human> m_humans;
         bool is_reached_goal=false;
         Elevator(int y, sf::Color color)
         {
@@ -83,6 +164,14 @@ class Elevator
             m_rectangle.setFillColor(m_color);
             m_rectangle.setOutlineColor(sf::Color::Yellow);
             m_rectangle.setOutlineThickness(5);
+        }
+
+        bool add_human(auto &&h) {
+            if(m_humans.size() < 10){
+                m_humans.push_back(std::move(h));
+                return true;
+            }
+            return false;
         }
 
         int get_x() const {
@@ -252,84 +341,6 @@ inline Buttongroup make_buttons(int pos_x, FLOORS floor, sf::Color color){
     };
 }
 
-class Human{
-    static sf::Texture m_texture;
-    sf::Sprite m_sprite;
-    int m_speed = 10;
-    bool m_startedmoving = false;
-    bool m_should_appear = true;
-
-    void rotate(double dt){
-        static int angle = 30;
-        if(!m_startedmoving){
-            m_sprite.rotate(angle*dt);
-        }
-        else{
-            m_sprite.rotate(2*angle*dt);
-        }
-        angle = -angle;
-        m_startedmoving = true;
-    }
-
-    public:
-    bool finished_moving = false;
-    int m_goal;
-    int m_beg;
-
-    Human(int y, int goal) : m_goal(goal), m_beg(y){
-        m_sprite.setTexture(m_texture);
-        m_sprite.setScale(0.1,0.1);
-        set_pos(y);
-    }
-
-    void set_pos(int y,int x=50){
-        int m_x;
-        if(FLOORS::FIRST==y || FLOORS::THIRD==y || FLOORS::FIFTH==y){
-            m_x=x;
-        }
-        else{
-            x == 50 ? m_x=SCREEN_WIDTH-50-m_sprite.getGlobalBounds().width : m_x=x;
-        }
-        int m_y=y+m_sprite.getGlobalBounds().height;
-        m_sprite.setPosition(m_x,m_y);
-    }
-
-    static void load_texture(){
-        if (!m_texture.loadFromFile("human.png"))
-        {
-            std::cout<<"Error loading texture"<<std::endl;
-        }
-    }
-    bool move(int goal_x, double dt){
-        const auto human_x = m_sprite.getPosition().x;
-        if(human_x == goal_x){
-            finished_moving = true;
-            return false;
-        }
-        if(human_x < goal_x)
-            m_sprite.move(m_speed*dt,0);
-        else if (human_x > goal_x)
-            m_sprite.move(-m_speed*dt,0);
-        rotate(dt);
-        // std::cout << "human_x: " << human_x << " goal: " << goal_x << std::endl;
-        return true;
-    }
-
-    void hide() {
-        m_should_appear = false;
-    }
-
-
-    void show(){
-        m_should_appear = true;
-    }
-
-    void draw(sf::RenderWindow &window) const {
-        if(m_should_appear)
-            window.draw(m_sprite);
-    }
-};
-
 struct Floor {
     int m_width = (SCREEN_WIDTH-ELEVATOR_WIDTH-10)/2;
     int m_hight = FLOOR_HIGHT;
@@ -338,7 +349,9 @@ struct Floor {
     FLOORS m_pos_y;
     sf::RectangleShape rectangle;
     sf::Color color;
-    std::vector<Human> m_humans;
+    std::deque<Human> m_humans;
+    Human Exiting_human{0,0};
+    bool is_human_exiting = false;
     Floor(int pos_x, FLOORS pos_y, sf::Color color, bool is_left) : m_pos_x(pos_x), m_pos_y(pos_y), color(color), is_left(is_left) {
         rectangle.setSize(sf::Vector2f(m_width, m_hight));
         rectangle.setFillColor(color);
@@ -352,7 +365,20 @@ struct Floor {
         for(auto &human : m_humans){
             human.draw(window);
         }
+        if(is_human_exiting){
+            ::draw(Exiting_human,window);
+        }
         window.draw(rectangle);
+    }
+
+    void notify_human_droped_off(Human const & h){
+        Exiting_human = h; 
+        is_human_exiting = true;
+    }
+
+    void drop_off_human(auto &&h){ 
+        m_humans.emplace_back(static_cast<Human&&>(h));
+        notify_human_droped_off(h);
     }
 };
 
@@ -387,6 +413,11 @@ inline int find_border(int y){
         default: return 0;
     }
 }
+
+struct WeightObserver {
+    int Weight = 0;
+     
+};
 
 class ObjectManager{
     Elevator m_elevator{FLOORS::FIRST, sf::Color::Blue};
@@ -436,24 +467,48 @@ class ObjectManager{
         }
     }
 
+    bool drop_off(FLOORS Goal){
+        auto &humans = m_elevator.m_humans;
+        if(humans.empty()) return true;
+        for(auto i : humans){
+            if(i.m_goal != Goal) continue;
+            i.set_pos(Goal, m_elevator.get_x());
+            if(!i.move(0,dt)){ 
+                std::cout <<"Human finished moving" << std::endl;
+                return true;
+            }
+            else {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    
+    //should return true, if all the humans, that are supposed to be in the elevator, are in the elevator
+    //and false otherwise
+    bool pick_up(FLOORS floor){
+        auto &humans = m_floors.at(floor).m_humans;
+        if(humans.empty()) return true;
+        auto human = &humans.front();
+        if(!human->move(m_elevator.get_x(),dt))
+        {
+            m_elevator.add_to_path((FLOORS)human->m_goal);
+            if(!m_elevator.add_human(*human)){
+                return true;
+            }
+            //Debug:
+            human++;
+            humans.pop_front();
+        }
+        return false;
+    }
+
     //will be called once at the beginning
     void start(){
         Human::load_texture();
     }
 
-    bool pick_up(FLOORS floor){
-        auto &humans = m_floors.at(floor).m_humans;
-        if(humans.empty()) return false;
-        auto &human = humans.front();
-        if(human.move(m_elevator.get_x(), dt*0.5)){
-            m_elevator.add_to_path((FLOORS)human.m_goal);
-            return true;
-        }
-        else{
-            return false;
-        }
-
-    }
     //will be called once per frame
     void loop(){
         while (m_window.isOpen())
@@ -461,8 +516,11 @@ class ObjectManager{
 
             handle_events();
             if(!m_elevator.moving()){
-                while(pick_up((FLOORS)m_elevator.get_y()));
-                m_elevator.move_next();
+                drop_off((FLOORS)m_elevator.get_y());
+                if(pick_up((FLOORS)m_elevator.get_y()))
+                { 
+                    m_elevator.move_next();
+                }
             }
             m_window.clear(sf::Color::White);
             draw(m_window,m_elevator,m_buttongroups, m_floors);
