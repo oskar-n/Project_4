@@ -69,7 +69,7 @@ enum FLOORS{
 class Human{
     static sf::Texture m_texture;
     sf::Sprite m_sprite;
-    int m_speed = 5;
+    int m_speed = 50;
     bool m_should_appear = true;
     bool up = true;
     void up_down(){
@@ -218,28 +218,26 @@ class Elevator {
         }
 
         bool moving (int dt)
-        {   static int i=1;
+        {  
             if (m_rectangle.getPosition().y>m_y)
                 {
-                    if(i%20==0)
-                    {
+                    
                         m_rectangle.move(0,-1);
-                        i=0;
-                    };
+                       
+                    
                 }
                 if (m_rectangle.getPosition().y<m_y)
                 {
-                    if(i%20==0)
-                    {
+                   
                         m_rectangle.move(0,1);
-                        i=0;
-                    };
+                        
+                   
                 }
                 if(m_rectangle.getPosition().y == m_y)
                 {
                     return false;
                 }
-                i++;
+                
                 return true;
         }
 
@@ -398,8 +396,9 @@ class ObjectManager{
         make_buttons(50, FLOORS::FIFTH,sf::Color::Red)
     };
     Floors m_floors = make_floors(0, sf::Color::Green);
+    sf::Clock m_clock;
     sf::RenderWindow m_window{sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Elevator"};
-    const double dt = 0.05;
+    const double dt = 0.1;
     std::deque<HumanPtr> m_LeftOvers;
     
     void spawn_human(FLOORS Beg, FLOORS goal){
@@ -498,8 +497,13 @@ class ObjectManager{
 
     //will be called once per frame
     void loop(){
+       m_window.setFramerateLimit(60);
         while (m_window.isOpen())
         {
+           float current_time=m_clock.restart().asSeconds();
+           float fps = 1.f / current_time;
+              std::cout << "fps: " << fps << std::endl;
+
             handle_events();
             if(!m_elevator.moving(dt)){
                 drop_off((FLOORS)m_elevator.get_y());
