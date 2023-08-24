@@ -68,20 +68,15 @@ enum FLOORS{
 class Human{
     static sf::Texture m_texture;
     sf::Sprite m_sprite;
-    int m_speed = 10;
-    bool m_startedmoving = false;
+    int m_speed = 5;
     bool m_should_appear = true;
-
-    void rotate(double dt){
-        static int angle = 30;
-        if(!m_startedmoving){
-            m_sprite.rotate(angle*dt);
-        }
-        else{
-            m_sprite.rotate(2*angle*dt);
-        }
-        angle = -angle;
-        m_startedmoving = true;
+    bool up = true;
+    void up_down(){
+        if(up)
+            m_sprite.move(0,-5);
+        else 
+            m_sprite.move(0,5);
+        up=!up;
     }
 
     public:
@@ -122,6 +117,7 @@ class Human{
     }
     bool move(int goal_x, double dt){
         const auto human_x = m_sprite.getPosition().x;
+        static int i = 1;
         if(human_x == goal_x){
             finished_moving = true;
             return false;
@@ -130,7 +126,7 @@ class Human{
             m_sprite.move(m_speed*dt,0);
         else if (human_x > goal_x)
             m_sprite.move(-m_speed*dt,0);
-        rotate(dt);
+        up_down();
         std::cout << "human_x: " << human_x << " goal: " << goal_x << std::endl;
         return true;
     }
@@ -220,21 +216,30 @@ class Elevator {
             return m_rectangle.getPosition().y;
         }
 
-        bool moving ()
-        {   
+        bool moving (int dt)
+        {   static int i=1;
             if (m_rectangle.getPosition().y>m_y)
-            {
-                m_rectangle.move(0,-1);
-            }
-            if (m_rectangle.getPosition().y<m_y)
-            {
-                m_rectangle.move(0,1);
-            }
-            if(m_rectangle.getPosition().y == m_y)
-            {
-                return false;
-            }
-            return true;
+                {
+                    if(i%20==0)
+                    {
+                        m_rectangle.move(0,-1);
+                        i=0;
+                    };
+                }
+                if (m_rectangle.getPosition().y<m_y)
+                {
+                    if(i%20==0)
+                    {
+                        m_rectangle.move(0,1);
+                        i=0;
+                    };
+                }
+                if(m_rectangle.getPosition().y == m_y)
+                {
+                    return false;
+                }
+                i++;
+                return true;
         }
 
         void draw(sf::RenderWindow &window)
@@ -494,7 +499,7 @@ class ObjectManager{
         while (m_window.isOpen())
         {
             handle_events();
-            if(!m_elevator.moving()){
+            if(!m_elevator.moving(dt)){
                 drop_off((FLOORS)m_elevator.get_y());
                 if(pick_up((FLOORS)m_elevator.get_y()))
                 { 
