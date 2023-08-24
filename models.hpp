@@ -8,6 +8,7 @@
 #include "utils.hpp"
 #include <unordered_map>
 #include <utility>
+#include <memory>
 
 constexpr int SCREEN_WIDTH   =1500;
 constexpr int SCREEN_HEIGHT  =1200;
@@ -34,9 +35,13 @@ template <typename Key, typename Val>
 void draw(std::unordered_map<Key,Val> &Object_cont, sf::RenderWindow &window){
     for (auto &[key,value]: Object_cont)
     {
-        // Dereference and draw the value
         draw(value, window);
     }
+}
+
+template <typename T>
+void draw(T* &Object, sf::RenderWindow &window){
+    Object->draw(window);
 }
 
 template <Container C>
@@ -48,7 +53,7 @@ void draw(C &Object_cont, sf::RenderWindow &window){
 }
 
 template <typename... Args>
-void draw(sf::RenderWindow &win, Args... args){
+void draw(sf::RenderWindow &win, Args &...args){
     (draw(args, win), ...);
 }
 
@@ -59,7 +64,6 @@ enum FLOORS{
     FOURTH=350,
     FIFTH=150,
 };
-
 
 class Human{
     static sf::Texture m_texture;
@@ -84,11 +88,14 @@ class Human{
     bool finished_moving = false;
     int m_goal;
     int m_beg;
-
     Human(int y, int goal) : m_goal(goal), m_beg(y){
         m_sprite.setTexture(m_texture);
         m_sprite.setScale(0.1,0.1);
         set_pos(y);
+    }
+
+    int get_x() const {
+        return m_sprite.getPosition().x;
     }
 
     void set_pos(int y,int x=50){
@@ -138,9 +145,17 @@ class Human{
             window.draw(m_sprite);
     }
 };
+using HumanPtr = Human*;
 
-class Elevator
-{
+void Human_cleaner(Container auto &cont){
+    if(cont.empty()) return;
+    for(auto &i : cont){
+        if(i == nullptr) continue;
+        delete i;
+    }
+}
+
+class Elevator {
     private:
         const int m_x=SCREEN_WIDTH/2 - ELEVATOR_WIDTH/2;
         int m_y=0;
@@ -153,7 +168,7 @@ class Elevator
         UniqueQueue<FLOORS> m_path;
     public:
         bool is_reached_beg=false;
-        std::vector<Human> m_humans;
+        std::deque<HumanPtr> m_humans;
         bool is_reached_goal=false;
         Elevator(int y, sf::Color color)
         {
@@ -166,9 +181,10 @@ class Elevator
             m_rectangle.setOutlineThickness(5);
         }
 
-        bool add_human(auto &&h) {
+        bool move_human_to(auto &h) {
             if(m_humans.size() < 10){
-                m_humans.push_back(std::move(h));
+                m_humans.emplace_back(h);
+                h = nullptr;
                 return true;
             }
             return false;
@@ -265,6 +281,10 @@ class Elevator
         void start(){
             m_should_move=true;
         }
+        ~Elevator(){
+            std::cerr <<"Elevator destructor called"<<std::endl;
+            Human_cleaner(m_humans);
+        }
 };
 
 class Button{
@@ -349,8 +369,7 @@ struct Floor {
     FLOORS m_pos_y;
     sf::RectangleShape rectangle;
     sf::Color color;
-    std::deque<Human> m_humans;
-    Human Exiting_human{0,0};
+    std::deque<HumanPtr> m_humans{};
     bool is_human_exiting = false;
     Floor(int pos_x, FLOORS pos_y, sf::Color color, bool is_left) : m_pos_x(pos_x), m_pos_y(pos_y), color(color), is_left(is_left) {
         rectangle.setSize(sf::Vector2f(m_width, m_hight));
@@ -363,22 +382,15 @@ struct Floor {
 
     void draw(sf::RenderWindow &window){
         for(auto &human : m_humans){
-            human.draw(window);
-        }
-        if(is_human_exiting){
-            ::draw(Exiting_human,window);
+            if(human == nullptr) continue;
+            human->draw(window);
         }
         window.draw(rectangle);
     }
 
-    void notify_human_droped_off(Human const & h){
-        Exiting_human = h; 
-        is_human_exiting = true;
-    }
-
-    void drop_off_human(auto &&h){ 
-        m_humans.emplace_back(static_cast<Human&&>(h));
-        notify_human_droped_off(h);
+    ~Floor(){
+        std::cerr <<"Floor destructor called"<<std::endl;
+        Human_cleaner(m_humans);
     }
 };
 
@@ -414,11 +426,6 @@ inline int find_border(int y){
     }
 }
 
-struct WeightObserver {
-    int Weight = 0;
-     
-};
-
 class ObjectManager{
     Elevator m_elevator{FLOORS::FIRST, sf::Color::Blue};
     std::array<Buttongroup, 5> m_buttongroups = {
@@ -430,12 +437,13 @@ class ObjectManager{
     };
     Floors m_floors = make_floors(0, sf::Color::Green);
     sf::RenderWindow m_window{sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Elevator"};
-    const double dt = 0.1;
+    const double dt = 0.05;
     bool human_entered = false;
-
+    std::deque<HumanPtr> m_LeftOvers;
+    
     void spawn_human(FLOORS Beg, FLOORS goal){
         m_elevator.add_to_path(Beg);
-        m_floors.at(Beg).m_humans.emplace_back((int)Beg,(int)goal);
+        m_floors.at(Beg).m_humans.emplace_back(new Human(Beg, goal));
     }
 
     void buttongr_pressed(Buttongroup &bg){
@@ -449,13 +457,31 @@ class ObjectManager{
         }    
     }
 
+    /* Left overs as in humans, no logger taking part in the elevator path decision.
+     * are to be moved from the scene, so all that is needed is to use the move_to_leftovers
+     * and the object manager will move everyhuman off the screen*/
+    void move_to_leftovers(HumanPtr &h){
+        m_LeftOvers.push_back(h);
+        h=nullptr;
+    }
+
+    void move_leftovers(){
+        if(m_LeftOvers.empty()) return;
+        for(auto & i : m_LeftOvers){
+            if(i == nullptr) continue;
+            if(!i->move(find_border(i->get_x()),dt)){
+                m_LeftOvers.pop_front();
+                delete i;
+                i = nullptr;
+            }
+        }
+    }
+
     public:
     void handle_events(){
         sf::Event event;
         while (m_window.pollEvent(event))
         {
-            if (event.type == sf::Event::Closed)
-                m_window.close();
             if (event.type==sf::Event::KeyPressed && event.key.scancode == sf::Keyboard::Scan::Escape )
                 m_window.close();
             if (event.type==sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left)
@@ -467,34 +493,29 @@ class ObjectManager{
         }
     }
 
-    bool drop_off(FLOORS Goal){
+    void drop_off(FLOORS Goal){
         auto &humans = m_elevator.m_humans;
-        if(humans.empty()) return true;
-        for(auto i : humans){
-            if(i.m_goal != Goal) continue;
-            i.set_pos(Goal, m_elevator.get_x());
-            if(!i.move(0,dt)){ 
-                std::cout <<"Human finished moving" << std::endl;
-                return true;
-            }
-            else {
-                return false;
-            }
+        if(humans.empty()) return;
+        for(auto &i : humans){
+            if(i == nullptr) continue;
+            if(i->m_goal != Goal) continue; 
+            i->set_pos(Goal, m_elevator.get_x());
+            move_to_leftovers(i);
+            //i = nullptr; at this point the human is moved to the left overs
         }
-        return true;
     }
 
-    
     //should return true, if all the humans, that are supposed to be in the elevator, are in the elevator
     //and false otherwise
     bool pick_up(FLOORS floor){
         auto &humans = m_floors.at(floor).m_humans;
         if(humans.empty()) return true;
         auto human = &humans.front();
-        if(!human->move(m_elevator.get_x(),dt))
+        if(!(*human)->move(m_elevator.get_x(),dt))
         {
-            m_elevator.add_to_path((FLOORS)human->m_goal);
-            if(!m_elevator.add_human(*human)){
+            m_elevator.add_to_path((FLOORS)(*human)->m_goal);
+            if(!m_elevator.move_human_to(*human)){
+                move_to_leftovers(*human);
                 return true;
             }
             //Debug:
@@ -513,7 +534,6 @@ class ObjectManager{
     void loop(){
         while (m_window.isOpen())
         {
-
             handle_events();
             if(!m_elevator.moving()){
                 drop_off((FLOORS)m_elevator.get_y());
@@ -522,10 +542,15 @@ class ObjectManager{
                     m_elevator.move_next();
                 }
             }
+            move_leftovers();
             m_window.clear(sf::Color::White);
-            draw(m_window,m_elevator,m_buttongroups, m_floors);
+            draw(m_window,m_elevator,m_buttongroups, m_floors, m_LeftOvers);
             m_window.display();
         }
+    }
+    ~ObjectManager(){
+        std::cerr <<"ObjectManager destructor called"<<std::endl;
+        Human_cleaner(m_LeftOvers);
     }
 };
 
