@@ -98,6 +98,10 @@ class Human{
         return m_sprite.getPosition().x;
     }
 
+    int get_y() const {
+        return m_sprite.getPosition().y - m_sprite.getGlobalBounds().height;
+    }
+
     void set_pos(int y,int x=50){
         int m_x;
         if(FLOORS::FIRST==y || FLOORS::THIRD==y || FLOORS::FIFTH==y){
@@ -127,7 +131,7 @@ class Human{
         else if (human_x > goal_x)
             m_sprite.move(-m_speed*dt,0);
         rotate(dt);
-        // std::cout << "human_x: " << human_x << " goal: " << goal_x << std::endl;
+        std::cout << "human_x: " << human_x << " goal: " << goal_x << std::endl;
         return true;
     }
 
@@ -161,8 +165,6 @@ class Elevator {
         int m_y=0;
         int m_width=ELEVATOR_WIDTH;
         int m_hight=ELEVATOR_HIGHT;
-        bool m_is_moving=false;
-        bool m_should_move=true;
         sf::Color m_color;
         sf::RectangleShape m_rectangle;
         UniqueQueue<FLOORS> m_path;
@@ -220,40 +222,19 @@ class Elevator {
 
         bool moving ()
         {   
-            if(m_should_move)
+            if (m_rectangle.getPosition().y>m_y)
             {
-                if (m_rectangle.getPosition().y>m_y)
-                {
-                    m_rectangle.move(0,-1);
-                }
-                if (m_rectangle.getPosition().y<m_y)
-                {
-                    m_rectangle.move(0,1);
-                }
-                if(m_rectangle.getPosition().y == m_y)
-                {
-                    m_is_moving=false;
-                    return false;
-                }
-                m_is_moving=true;
-                return true;
+                m_rectangle.move(0,-1);
             }
-            return false;
-        }
-
-        bool is_moving()
-        {
-            return m_is_moving;
-        }
-
-        bool should_move()
-        {
-            return m_should_move;
-        }
-
-        void set_pos(int y)
-        {   
-            m_y=y;
+            if (m_rectangle.getPosition().y<m_y)
+            {
+                m_rectangle.move(0,1);
+            }
+            if(m_rectangle.getPosition().y == m_y)
+            {
+                return false;
+            }
+            return true;
         }
 
         void draw(sf::RenderWindow &window)
@@ -261,26 +242,6 @@ class Elevator {
             window.draw(m_rectangle);
         }
 
-        void reach_check()
-        {
-            
-            if (m_rectangle.getPosition().y==m_y && is_reached_beg==true)
-            {
-                is_reached_goal=true;
-                
-            }
-            if (m_rectangle.getPosition().y==m_y)
-            {
-                is_reached_beg=true;
-            }
-        }
-
-        void pause(){
-            m_should_move=false;
-        }
-        void start(){
-            m_should_move=true;
-        }
         ~Elevator(){
             std::cerr <<"Elevator destructor called"<<std::endl;
             Human_cleaner(m_humans);
@@ -320,9 +281,6 @@ class Button{
             m_text.setPosition(m_pos_x+m_width/2, m_pos_y-10);
         }
 
-        void make_red(){
-            m_color=sf::Color::Red;
-        }
 
         void draw(sf::RenderWindow &window)
         {
@@ -365,19 +323,18 @@ struct Floor {
     int m_width = (SCREEN_WIDTH-ELEVATOR_WIDTH-10)/2;
     int m_hight = FLOOR_HIGHT;
     bool is_left;
-    int m_pos_x;
-    FLOORS m_pos_y;
     sf::RectangleShape rectangle;
     sf::Color color;
     std::deque<HumanPtr> m_humans{};
+    int m_border;
     bool is_human_exiting = false;
-    Floor(int pos_x, FLOORS pos_y, sf::Color color, bool is_left) : m_pos_x(pos_x), m_pos_y(pos_y), color(color), is_left(is_left) {
+    Floor(int pos_x, FLOORS pos_y, sf::Color color, bool is_left, int _border) :  is_left(is_left) ,color(color), m_border(_border){
         rectangle.setSize(sf::Vector2f(m_width, m_hight));
         rectangle.setFillColor(color);
         rectangle.setOutlineColor(sf::Color::Yellow);
         rectangle.setOutlineThickness(5);
-        if(is_left)rectangle.setPosition(m_pos_x, m_pos_y+ELEVATOR_HIGHT);
-        else rectangle.setPosition(SCREEN_WIDTH-m_pos_x-m_width, m_pos_y+ELEVATOR_HIGHT);
+        if(is_left)rectangle.setPosition(pos_x, pos_y+ELEVATOR_HIGHT);
+        else rectangle.setPosition(SCREEN_WIDTH-pos_x-m_width, pos_y+ELEVATOR_HIGHT);
     }
 
     void draw(sf::RenderWindow &window){
@@ -387,7 +344,6 @@ struct Floor {
         }
         window.draw(rectangle);
     }
-
     ~Floor(){
         std::cerr <<"Floor destructor called"<<std::endl;
         Human_cleaner(m_humans);
@@ -398,13 +354,24 @@ using Floors = std::unordered_map<FLOORS, Floor>;
 
 inline Floors make_floors(int pos_x, sf::Color color){
     return Floors{
-        {FLOORS::FIRST, Floor(pos_x, FLOORS::FIRST, color, true)},
-        {FLOORS::SECOND, Floor(pos_x, FLOORS::SECOND, color, false)},
-        {FLOORS::THIRD, Floor(pos_x, FLOORS::THIRD, color, true)},
-        {FLOORS::FOURTH, Floor(pos_x, FLOORS::FOURTH, color, false)},
-        {FLOORS::FIFTH, Floor(pos_x, FLOORS::FIFTH, color, true)}
+        {FLOORS::FIRST, Floor(pos_x, FLOORS::FIRST, color, true,0)},
+        {FLOORS::SECOND, Floor(pos_x, FLOORS::SECOND, color, false,SCREEN_WIDTH)},
+        {FLOORS::THIRD, Floor(pos_x, FLOORS::THIRD, color, true,0)},
+        {FLOORS::FOURTH, Floor(pos_x, FLOORS::FOURTH, color, false,SCREEN_WIDTH)},
+        {FLOORS::FIFTH, Floor(pos_x, FLOORS::FIFTH, color, true,0)}
     };
 }
+
+//finds the correct floor, based on the y coordinate
+inline FLOORS find_floor(int y){
+    std::array<int, 7> floors = {FLOORS::FIRST+1,FLOORS::FIRST, FLOORS::SECOND, FLOORS::THIRD, FLOORS::FOURTH, FLOORS::FIFTH, 0};
+    for(int i = 0; i < floors.size()-1; i++){
+        if(y <= floors[i] && y >= floors[i+1]){
+            return (FLOORS)floors[i];
+        }
+    }
+    throw std::runtime_error("No floor found");
+};
 
 inline int get_boundry(FLOORS floor){
     if(FLOORS::FIRST==floor || FLOORS::THIRD==floor || FLOORS::FIFTH==floor){
@@ -412,17 +379,6 @@ inline int get_boundry(FLOORS floor){
     }
     else{
         return SCREEN_WIDTH;
-    }
-}
-
-inline int find_border(int y){
-    switch(y) {
-        case FLOORS::FIRST: return 0;
-        case FLOORS::SECOND: return SCREEN_WIDTH;
-        case FLOORS::THIRD: return 0;
-        case FLOORS::FOURTH: return SCREEN_WIDTH;
-        case FLOORS::FIFTH: return 0;
-        default: return 0;
     }
 }
 
@@ -438,7 +394,6 @@ class ObjectManager{
     Floors m_floors = make_floors(0, sf::Color::Green);
     sf::RenderWindow m_window{sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Elevator"};
     const double dt = 0.05;
-    bool human_entered = false;
     std::deque<HumanPtr> m_LeftOvers;
     
     void spawn_human(FLOORS Beg, FLOORS goal){
@@ -457,6 +412,23 @@ class ObjectManager{
         }    
     }
 
+    void move_leftovers(){
+        if(m_LeftOvers.empty()) return;
+        for(auto & i : m_LeftOvers){
+            if(i == nullptr) continue;
+            int &floor_border = m_floors.at(find_floor(i->get_y())).m_border;
+            std::cout << "floor_border: " << floor_border << std::endl;
+            std::cout << "i->get_y(): " << i->get_y() << std::endl;
+            if(!i->move(floor_border, dt)){
+                m_LeftOvers.erase(std::find(m_LeftOvers.begin(), m_LeftOvers.end(), i));
+                delete i;
+                i = nullptr;
+            }
+        }
+    }
+
+    public:
+
     /* Left overs as in humans, no logger taking part in the elevator path decision.
      * are to be moved from the scene, so all that is needed is to use the move_to_leftovers
      * and the object manager will move everyhuman off the screen*/
@@ -465,19 +437,6 @@ class ObjectManager{
         h=nullptr;
     }
 
-    void move_leftovers(){
-        if(m_LeftOvers.empty()) return;
-        for(auto & i : m_LeftOvers){
-            if(i == nullptr) continue;
-            if(!i->move(find_border(i->get_x()),dt)){
-                m_LeftOvers.pop_front();
-                delete i;
-                i = nullptr;
-            }
-        }
-    }
-
-    public:
     void handle_events(){
         sf::Event event;
         while (m_window.pollEvent(event))
