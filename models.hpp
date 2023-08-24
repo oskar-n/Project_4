@@ -41,7 +41,8 @@ void draw(std::unordered_map<Key,Val> &Object_cont, sf::RenderWindow &window){
 
 template <typename T>
 void draw(T* &Object, sf::RenderWindow &window){
-    Object->draw(window);
+    if(Object != nullptr)
+        Object->draw(window);
 }
 
 template <Container C>
@@ -470,6 +471,7 @@ class ObjectManager{
         auto &humans = m_floors.at(floor).m_humans;
         if(humans.empty()) return true;
         auto human = &humans.front();
+        if(*human == nullptr) return true;
         if(!(*human)->move(m_elevator.get_x(),dt))
         {
             m_elevator.add_to_path((FLOORS)(*human)->m_goal);
