@@ -20,44 +20,6 @@ constexpr int COUNTER_WIDTH = 200;
 constexpr int COUNTER_HIGHT = 50;
 constexpr int HUMAN_WEIGHT = 70;
 
-template <typename T>
-concept Container = requires(T t) {
-    {t.begin()} -> std::same_as<typename T::iterator>;
-    {t.end()} -> std::same_as<typename T::iterator>;
-};
-
-template <typename T>
-void draw(T &Object, sf::RenderWindow &window){
-    Object.draw(window);
-}
-
-template <typename Key, typename Val>
-void draw(std::unordered_map<Key,Val> &Object_cont, sf::RenderWindow &window){
-    for (auto &[key,value]: Object_cont)
-    {
-        draw(value, window);
-    }
-}
-
-template <typename T>
-void draw(T* &Object, sf::RenderWindow &window){
-    if(Object != nullptr)
-        Object->draw(window);
-}
-
-template <Container C>
-void draw(C &Object_cont, sf::RenderWindow &window){
-    for (auto &i: Object_cont)
-    {
-        draw(i,window);
-    }
-}
-
-template <typename... Args>
-void draw(sf::RenderWindow &win, Args &...args){
-    (draw(args, win), ...);
-}
-
 enum FLOORS{
     FIRST=950,
     SECOND=750,
@@ -69,16 +31,9 @@ enum FLOORS{
 class Human{
     static sf::Texture m_texture;
     sf::Sprite m_sprite;
-    int m_speed = 50;
+    int m_speed = 1;
     bool m_should_appear = true;
     bool up = true;
-    void up_down(){
-        if(up)
-            m_sprite.move(0,-5);
-        else 
-            m_sprite.move(0,5);
-        up=!up;
-    }
 
     public:
     bool finished_moving = false;
@@ -95,7 +50,8 @@ class Human{
     }
 
     int get_y() const {
-        return m_sprite.getPosition().y - m_sprite.getGlobalBounds().height;
+        int offset = 0;
+        return m_sprite.getPosition().y - m_sprite.getGlobalBounds().height + offset;
     }
 
     void set_pos(int y,int x=50){
@@ -118,16 +74,14 @@ class Human{
     }
     bool move(int goal_x, double dt){
         const auto human_x = m_sprite.getPosition().x;
-        static int i = 1;
         if(human_x == goal_x){
             finished_moving = true;
             return false;
         }
         if(human_x < goal_x)
-            m_sprite.move(m_speed*dt,0);
+            m_sprite.move(m_speed,0);
         else if (human_x > goal_x)
-            m_sprite.move(-m_speed*dt,0);
-        up_down();
+            m_sprite.move(-m_speed,0);
         std::cout << "human_x: " << human_x << " goal: " << goal_x << std::endl;
         return true;
     }
@@ -135,7 +89,6 @@ class Human{
     void hide() {
         m_should_appear = false;
     }
-
 
     void show(){
         m_should_appear = true;
@@ -209,7 +162,11 @@ class Elevator {
             for(auto i : m_path){
                 std::cout << i << std::endl;
             }
-            std::sort(m_path.begin(), m_path.end());
+            auto y = m_rectangle.getPosition().y;
+
+            std::sort(m_path.begin(), m_path.end(),[this](auto &a, auto &b){
+                return abs(a-(this->get_y())) < abs(b-(this->get_y()));
+            });
         }
 
         int get_y() const
@@ -222,19 +179,16 @@ class Elevator {
             if (m_rectangle.getPosition().y>m_y)
                 {
                     
-                        m_rectangle.move(0,-1);
-                       
-                    
+                    m_rectangle.move(0,-1);
                 }
                 if (m_rectangle.getPosition().y<m_y)
                 {
-                   
-                        m_rectangle.move(0,1);
-                        
+                    m_rectangle.move(0,1);
                    
                 }
                 if(m_rectangle.getPosition().y == m_y)
                 {
+                    std::cout<<"reached"<<std::endl;
                     return false;
                 }
                 
@@ -368,23 +322,14 @@ inline Floors make_floors(int pos_x, sf::Color color){
 
 //finds the correct floor, based on the y coordinate
 inline FLOORS find_floor(int y){
-    std::array<int, 7> floors = {FLOORS::FIRST+1,FLOORS::FIRST, FLOORS::SECOND, FLOORS::THIRD, FLOORS::FOURTH, FLOORS::FIFTH, 0};
+    std::array<int, 6> floors = {FLOORS::FIRST, FLOORS::SECOND, FLOORS::THIRD, FLOORS::FOURTH, FLOORS::FIFTH, 0};
     for(int i = 0; i < floors.size()-1; i++){
-        if(y <= floors[i] && y >= floors[i+1]){
+        if(y < floors[i] && y >= floors[i+1]){
             return (FLOORS)floors[i];
         }
     }
     throw std::runtime_error("No floor found");
 };
-
-inline int get_boundry(FLOORS floor){
-    if(FLOORS::FIRST==floor || FLOORS::THIRD==floor || FLOORS::FIFTH==floor){
-        return 0;
-    }
-    else{
-        return SCREEN_WIDTH;
-    }
-}
 
 class ObjectManager{
     Elevator m_elevator{FLOORS::FIRST, sf::Color::Blue};
@@ -396,7 +341,7 @@ class ObjectManager{
         make_buttons(50, FLOORS::FIFTH,sf::Color::Red)
     };
     Floors m_floors = make_floors(0, sf::Color::Green);
-    sf::Clock m_clock;
+    // sf::Clock m_clock;
     sf::RenderWindow m_window{sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Elevator"};
     const double dt = 0.1;
     std::deque<HumanPtr> m_LeftOvers;
@@ -421,7 +366,7 @@ class ObjectManager{
         if(m_LeftOvers.empty()) return;
         for(auto & i : m_LeftOvers){
             if(i == nullptr) continue;
-            int &floor_border = m_floors.at(find_floor(i->get_y())).m_border;
+            int floor_border = m_floors.at(find_floor(i->get_y())).m_border;
             std::cout << "floor_border: " << floor_border << std::endl;
             std::cout << "i->get_y(): " << i->get_y() << std::endl;
             if(!i->move(floor_border, dt)){
@@ -497,12 +442,12 @@ class ObjectManager{
 
     //will be called once per frame
     void loop(){
-       m_window.setFramerateLimit(60);
+       m_window.setFramerateLimit(120);
         while (m_window.isOpen())
         {
-           float current_time=m_clock.restart().asSeconds();
-           float fps = 1.f / current_time;
-              std::cout << "fps: " << fps << std::endl;
+           // float current_time=m_clock.restart().asSeconds();
+           // float fps = 1.f / current_time;
+              // std::cout << "fps: " << fps << std::endl;
 
             handle_events();
             if(!m_elevator.moving(dt)){
