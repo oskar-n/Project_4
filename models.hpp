@@ -66,11 +66,21 @@ public:
       std::cerr << "Error loading texture" << std::endl;
     }
   }
+    void up_down(){
+        if(up)
+            m_sprite.move(0,-4);
+        else 
+            m_sprite.move(0,4);
+        up=!up;
+  };
+
   bool move(int goal_x, double dt) {
     const auto human_x = m_sprite.getPosition().x;
+    up_down();
     if (human_x == goal_x) {
       return false;
     }
+    
     if (human_x < goal_x)
       m_sprite.move(m_speed, 0);
     else if (human_x > goal_x)
@@ -210,11 +220,6 @@ public:
   }
 };
 
-struct Move {
-  int beg_floor;
-  int goal_floor;
-  Button &b;
-};
 
 using Buttongroup = std::array<Button, 5>;
 
@@ -285,6 +290,54 @@ inline FLOORS find_floor(int y) {
   throw std::runtime_error("No floor found");
 };
 
+class Counter{
+    private:
+    int m_pos_x;
+    int m_pos_y;
+    int m_width=COUNTER_WIDTH;
+    int m_hight=COUNTER_HIGHT;
+    sf::Color m_color;
+    sf::RectangleShape m_rectangle;
+    sf::Text m_text;
+    sf::Font m_font;
+    int m_count = 0;
+
+    public:
+    Counter(int pos_x, int pos_y, sf::Color color)
+        {
+            m_pos_x=pos_x;
+            m_pos_y=pos_y;
+            m_color=color;
+            m_rectangle.setSize(sf::Vector2f(m_width, m_hight));
+            if (!m_font.loadFromFile("digital-7.ttf"))
+            {
+                std::cout<<"Error loading font"<<std::endl;
+            }
+            m_text.setFont(m_font);
+            m_text.setCharacterSize(50);
+            m_text.setFillColor(sf::Color::White);
+        } 
+
+    void draw(sf::RenderWindow &window)
+    {
+        m_text.setString(std::to_string(m_count));
+        m_rectangle.setFillColor(m_color);
+        m_rectangle.setPosition(m_pos_x, m_pos_y);
+        m_text.setPosition(m_pos_x+m_width/2, m_pos_y-10);
+        window.draw(m_rectangle);
+        window.draw(m_text);
+    }
+    void up_count(){
+        m_count=m_count+HUMAN_WEIGHT;
+    }
+    void down_count(){
+        m_count=m_count-HUMAN_WEIGHT;
+    }
+    int get_count(){
+        return m_count;
+    }
+};
+
 class ObjectManager {
   Elevator m_elevator{FLOORS::FIRST, sf::Color::Blue};
   std::array<Buttongroup, 5> m_buttongroups = {
@@ -301,7 +354,7 @@ class ObjectManager {
                             "Elevator"};
   const double dt = 0.1;
   std::deque<HumanPtr> m_LeftOvers;
-
+  Counter m_counter{SCREEN_WIDTH/2-COUNTER_WIDTH/2, 0, sf::Color::Blue};
   void spawn_human(FLOORS Beg, FLOORS goal) {
     m_elevator.add_to_path(Beg);
     m_floors.at(Beg).m_humans.emplace_back(new Human(Beg, goal));
@@ -370,6 +423,7 @@ public:
         continue;
       i->set_pos(Goal, m_elevator.get_x());
       move_to_leftovers(i);
+      m_counter.down_count();
       // i = nullptr; at this point the human is moved to the left overs
     }
   }
@@ -391,6 +445,7 @@ public:
       }
       human++;
       humans.pop_front();
+      m_counter.up_count();
     }
     return false;
   }
@@ -400,7 +455,7 @@ public:
 
   // will be called once per frame
   void loop() {
-    m_window.setFramerateLimit(120);
+    m_window.setFramerateLimit(500);
     while (m_window.isOpen()) {
       handle_events();
       if (!m_elevator.moving(dt)) {
@@ -411,7 +466,7 @@ public:
       }
       move_leftovers();
       m_window.clear(sf::Color::White);
-      draw(m_window, m_elevator, m_buttongroups, m_floors, m_LeftOvers);
+      draw(m_window,m_counter, m_buttongroups, m_floors, m_LeftOvers, m_elevator);
       m_window.display();
     }
   }
