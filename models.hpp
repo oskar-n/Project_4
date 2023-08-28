@@ -9,6 +9,7 @@
 #include <ranges>
 #include <unordered_map>
 #include <utility>
+#include <algorithm>
 
 constexpr int SCREEN_WIDTH = 1500;
 constexpr int SCREEN_HEIGHT = 1200;
@@ -32,7 +33,7 @@ class Human {
   static sf::Texture m_texture;
   sf::Sprite m_sprite;
   int m_speed = 1;
-  bool up = true;
+  bool up = false;
 
 public:
   int m_goal;
@@ -54,7 +55,7 @@ public:
     if (FLOORS::FIRST == y || FLOORS::THIRD == y || FLOORS::FIFTH == y) {
       m_x = x;
     } else {
-      x == 50 ? m_x = SCREEN_WIDTH - 50 - m_sprite.getGlobalBounds().width
+      x == 50 ? m_x = SCREEN_WIDTH - x - m_sprite.getGlobalBounds().width
               : m_x = x;
     }
     int m_y = y + m_sprite.getGlobalBounds().height;
@@ -93,7 +94,7 @@ public:
 
 using HumanPtr = Human *;
 
-void Human_cleaner(Container auto &cont) {
+void Human_cleanup(Container auto &cont) {
   if (cont.empty())
     return;
   for (auto &i : cont) {
@@ -105,6 +106,7 @@ void Human_cleaner(Container auto &cont) {
 
 class Elevator {
 private:
+  static constexpr int MAX_HUMANS = 3;
   const int m_x = SCREEN_WIDTH / 2 - ELEVATOR_WIDTH / 2;
   int m_Goal = 0;
   int m_width = ELEVATOR_WIDTH;
@@ -125,8 +127,8 @@ public:
     m_rectangle.setOutlineThickness(5);
   }
 
-  bool move_human_to(auto &h) {
-    if (m_humans.size() < 10) {
+  bool move_human_inside(Human* &h) {
+    if (m_humans.size() < MAX_HUMANS) {
       m_humans.emplace_back(h);
       h = nullptr;
       return true;
@@ -171,7 +173,7 @@ public:
 
   void draw(sf::RenderWindow &window) { window.draw(m_rectangle); }
 
-  ~Elevator() { Human_cleaner(m_humans); }
+  ~Elevator() { Human_cleanup(m_humans); }
 };
 
 class Button {
@@ -263,7 +265,7 @@ struct Floor {
     }
     window.draw(rectangle);
   }
-  ~Floor() { Human_cleaner(m_humans); }
+  ~Floor() { Human_cleanup(m_humans); }
 };
 
 using Floors = std::unordered_map<FLOORS, Floor>;
@@ -439,11 +441,14 @@ public:
       return true;
     if (!(*human)->move(m_elevator.get_x(), dt)) {
       m_elevator.add_to_path((FLOORS)(*human)->m_goal);
-      if (!m_elevator.move_human_to(*human)) {
-        move_to_leftovers(*human);
+      if (!m_elevator.move_human_inside(*human)) {
+        std::for_each(humans.begin(),humans.end(),[this](auto &i){
+          if(i == nullptr)
+            return;
+          move_to_leftovers(i);
+        });
         return true;
       }
-      human++;
       humans.pop_front();
       m_counter.up_count();
     }
@@ -470,5 +475,5 @@ public:
       m_window.display();
     }
   }
-  ~ObjectManager() { Human_cleaner(m_LeftOvers); }
+  ~ObjectManager() { Human_cleanup(m_LeftOvers); }
 };
