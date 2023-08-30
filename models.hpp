@@ -53,9 +53,10 @@ public:
   void set_pos(int y, int x = 50, int offset = 0) {
     int m_x;
     if (FLOORS::FIRST == y || FLOORS::THIRD == y || FLOORS::FIFTH == y) {
-      m_x = x+m_sprite.getGlobalBounds().width*(offset);
+      m_x = x + m_sprite.getGlobalBounds().width * (offset);
     } else {
-      x == 50 ? m_x = SCREEN_WIDTH - x - m_sprite.getGlobalBounds().width*(1+offset)
+      x == 50 ? m_x = SCREEN_WIDTH - x -
+                      m_sprite.getGlobalBounds().width * (1 + offset)
               : m_x = x;
     }
     int m_y = y + m_sprite.getGlobalBounds().height;
@@ -144,7 +145,7 @@ public:
     std::sort(m_path.begin(), m_path.end(), [this](auto &a, auto &b) {
       return abs(a - (this->get_y())) < abs(b - (this->get_y()));
     });
-    //Debug
+    // Debug
     std::cout << "Path: ";
     for (auto i : m_path) {
       std::cout << (int)i << " ";
@@ -281,8 +282,8 @@ inline FLOORS find_floor(int y) {
   std::array<int, 6> floors = {FLOORS::FIRST,  FLOORS::SECOND, FLOORS::THIRD,
                                FLOORS::FOURTH, FLOORS::FIFTH,  0};
   for (int i = 0; i < floors.size() - 1; i++) {
-    if (y < floors[i] && y >= floors[i + 1]) {
-      return (FLOORS)floors[i];
+    if (y <= floors[i] && y > floors[i + 1]) {
+      return (FLOORS)floors[i]; 
     }
   }
   throw std::runtime_error("No floor found");
@@ -327,6 +328,25 @@ public:
   int get_count() { return m_count; }
 };
 
+inline int find_drop_off(int y, int elevator_x) {
+  FLOORS floor = find_floor(y);
+  std::cerr << "Floor: " << (int)floor << std::endl;
+  switch (floor) {
+  case FLOORS::FIRST:
+    return elevator_x;
+  case FLOORS::SECOND:
+    return elevator_x + ELEVATOR_WIDTH;
+  case FLOORS::THIRD:
+    return elevator_x;
+  case FLOORS::FOURTH:
+    return elevator_x + ELEVATOR_WIDTH;
+  case FLOORS::FIFTH:
+    return elevator_x;
+  default:
+    throw std::runtime_error("No floor found");
+  }
+}
+
 class ObjectManager {
   Elevator m_elevator{FLOORS::FIRST, sf::Color::Blue};
   std::array<Buttongroup, 5> m_buttongroups = {
@@ -346,7 +366,8 @@ class ObjectManager {
   Counter m_counter{SCREEN_WIDTH / 2 - COUNTER_WIDTH / 2, 0, sf::Color::Blue};
   void spawn_human(FLOORS Beg, FLOORS goal) {
     m_elevator.add_to_path(Beg);
-    m_floors.at(Beg).m_humans.emplace_back(new Human(Beg, goal, m_floors.at(Beg).m_humans.size()));
+    m_floors.at(Beg).m_humans.emplace_back(
+        new Human(Beg, goal, m_floors.at(Beg).m_humans.size()));
   }
 
   void buttongr_pressed(Buttongroup &bg) {
@@ -401,21 +422,22 @@ public:
     }
   }
 
-  void drop_off(FLOORS Goal) {
+  bool drop_off(FLOORS Goal) {
     auto &humans = m_elevator.m_humans;
     if (humans.empty())
-      return;
+      return true;
     for (auto &i : humans) {
       if (i == nullptr)
         continue;
       if (i->m_goal != Goal)
         continue;
-      i->set_pos(Goal, m_elevator.get_x());
+      i->set_pos(Goal, find_drop_off(Goal, m_elevator.get_x()));
       move_to_leftovers(i);
       humans.erase(std::find(humans.begin(), humans.end(), i));
       m_counter.down_count();
       // i = nullptr; at this point the human is moved to the left overs
     }
+    return true;
   }
 
   // should return true, if all the humans, that are supposed to be in the
@@ -452,8 +474,8 @@ public:
     while (m_window.isOpen()) {
       handle_events();
       if (!m_elevator.moving(dt)) {
-        drop_off((FLOORS)m_elevator.get_y());
-        if (pick_up((FLOORS)m_elevator.get_y())) {
+        if (pick_up((FLOORS)m_elevator.get_y()) &&
+            drop_off((FLOORS)m_elevator.get_y())) {
           m_elevator.move_next();
         }
       }
