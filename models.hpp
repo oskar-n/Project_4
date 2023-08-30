@@ -38,10 +38,10 @@ class Human {
 public:
   int m_goal;
   int m_beg;
-  Human(int y, int goal) : m_goal(goal), m_beg(y) {
+  Human(int y, int goal, int offset) : m_goal(goal), m_beg(y) {
     m_sprite.setTexture(m_texture);
     m_sprite.setScale(0.1, 0.1);
-    set_pos(y);
+    set_pos(y, 50, offset);
   }
 
   int get_x() const { return m_sprite.getPosition().x; }
@@ -50,12 +50,12 @@ public:
     return m_sprite.getPosition().y - m_sprite.getGlobalBounds().height;
   }
 
-  void set_pos(int y, int x = 50) {
+  void set_pos(int y, int x = 50, int offset = 0) {
     int m_x;
     if (FLOORS::FIRST == y || FLOORS::THIRD == y || FLOORS::FIFTH == y) {
-      m_x = x;
+      m_x = x+m_sprite.getGlobalBounds().width*(offset);
     } else {
-      x == 50 ? m_x = SCREEN_WIDTH - x - m_sprite.getGlobalBounds().width
+      x == 50 ? m_x = SCREEN_WIDTH - x - m_sprite.getGlobalBounds().width*(1+offset)
               : m_x = x;
     }
     int m_y = y + m_sprite.getGlobalBounds().height;
@@ -346,7 +346,7 @@ class ObjectManager {
   Counter m_counter{SCREEN_WIDTH / 2 - COUNTER_WIDTH / 2, 0, sf::Color::Blue};
   void spawn_human(FLOORS Beg, FLOORS goal) {
     m_elevator.add_to_path(Beg);
-    m_floors.at(Beg).m_humans.emplace_back(new Human(Beg, goal));
+    m_floors.at(Beg).m_humans.emplace_back(new Human(Beg, goal, m_floors.at(Beg).m_humans.size()));
   }
 
   void buttongr_pressed(Buttongroup &bg) {
