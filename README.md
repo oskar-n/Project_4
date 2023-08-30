@@ -1,6 +1,6 @@
 # Project 4 - Elevator simulation
 ----
-###Basic Information
+### Basic Information
 
 <font size="5">This project simulates an elevator. Clicking numbered buttons above respective floors spawns a human that goes to whichever floor was chosen. </font>
 
@@ -14,6 +14,6 @@ Elevator movement is based on a queue that choose optimal route to drop off pass
 </font>
 
 ---
-###Authors
+### Authors
 <font size="5">Hubert Rotkiewicz, Oskar Nakielski </font>
 
