@@ -312,13 +312,13 @@ public:
     m_text.setFont(m_font);
     m_text.setCharacterSize(50);
     m_text.setFillColor(sf::Color::White);
-    m_text.setString(std::to_string(m_count));
     m_rectangle.setFillColor(m_color);
     m_rectangle.setPosition(m_pos_x, m_pos_y);
     m_text.setPosition(m_pos_x + m_width / 2, m_pos_y - 10);
   }
 
-  void draw(sf::RenderWindow &window) const {
+  void draw(sf::RenderWindow &window) {
+    m_text.setString(std::to_string(m_count));
     window.draw(m_rectangle);
     window.draw(m_text);
   }
