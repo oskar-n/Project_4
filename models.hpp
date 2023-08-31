@@ -40,7 +40,7 @@ public:
   int m_beg;
   Human(int y, int goal, int offset) : m_goal(goal), m_beg(y) {
     m_sprite.setTexture(m_texture);
-    m_sprite.setScale(0.1, 0.1);
+    m_sprite.setScale(0.08, 0.1);
     set_pos(y, 50, offset);
   }
 
@@ -99,7 +99,7 @@ void Human_cleanup(Container auto &cont) {
 
 class Elevator {
 private:
-  static constexpr int MAX_HUMANS = 3;
+  static constexpr int MAX_HUMANS = 8;
   const int m_x = SCREEN_WIDTH / 2 - ELEVATOR_WIDTH / 2;
   int m_Goal = 0;
   int m_width = ELEVATOR_WIDTH;
@@ -146,13 +146,36 @@ public:
       return abs(a - (this->get_y())) < abs(b - (this->get_y()));
     });
     // Debug
-    std::cout << "Path: ";
-    for (auto i : m_path) {
-      std::cout << (int)i << " ";
-    }
+    // std::cout << "Path: ";
+    // for (auto i : m_path) {
+    //   std::cout << (int)i << " ";
+    // }
   }
 
+
   int get_y() const { return m_rectangle.getPosition().y; }
+
+  void return_check(sf::Clock &clock, bool areAllFloorsEmpty){
+    if(get_y() != FLOORS::FIRST)
+    { 
+      if(  areAllFloorsEmpty != true || m_humans.size() != 0)
+      {
+        clock.restart();
+      }
+      else 
+      {  
+        if(clock.getElapsedTime().asSeconds() > 5)
+            {
+              m_Goal = FLOORS::FIRST;
+              move_next();
+              clock.restart();
+            }
+            std::cout<<clock.getElapsedTime().asSeconds()<<std::endl;
+      }
+    }
+    else clock.restart();
+  }
+
 
   bool moving(int dt) {
     if (m_rectangle.getPosition().y > m_Goal) {
@@ -288,6 +311,16 @@ inline FLOORS find_floor(int y) {
   }
   throw std::runtime_error("No floor found");
 };
+//checks if there are humans 
+bool areAllFloorsEmpty(const Floors &floors) {
+    for (const auto &floorPair : floors) {
+        const Floor &floor = floorPair.second;
+        if (floor.m_humans.size() != 0)  {
+            return false; // If any floor is not empty, return false.
+        }
+    }
+    return true; // All floors are empty.
+}
 
 class Counter {
 private:
@@ -358,7 +391,7 @@ class ObjectManager {
                    sf::Color::Red),
       make_buttons(50, FLOORS::FIFTH, sf::Color::Red)};
   Floors m_floors = make_floors(0, sf::Color::Green);
-  // sf::Clock m_clock;
+  sf::Clock m_clock;
   sf::RenderWindow m_window{sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT),
                             "Elevator"};
   const double dt = 0.1;
@@ -480,6 +513,7 @@ public:
         }
       }
       move_leftovers();
+      m_elevator.return_check(m_clock, areAllFloorsEmpty(m_floors));
       m_window.clear(sf::Color::White);
       draw(m_window, m_counter, m_buttongroups, m_floors, m_LeftOvers,
            m_elevator);
