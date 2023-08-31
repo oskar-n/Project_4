@@ -12,7 +12,7 @@
 ----
 ### Technical description
 
-<font size="5">Project uses SFML library to display a window. Every object has it's own separate class and 'ObjectManager' operates the whole program. 'ObjectManager.loop' is the main loop of the program that contains all of the functions. Floors and elevator have their own containers for humans. Elevator movement is based on a queue of paths that choose optimal route to drop off passengers.
+<font size="5">Project uses SFML library to display a window. Every object has it's own separate class and 'ObjectManager' operates the whole program. 'ObjectManager.loop' is the main loop of the program that contains all of the functions. Floors and elevator have their own containers for humans. Elevator movement is based on a queue of paths that chooses optimal route to drop off passengers.
 </font>
 
 ---
