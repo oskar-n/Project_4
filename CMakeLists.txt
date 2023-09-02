@@ -1,7 +1,15 @@
 cmake_minimum_required(VERSION 3.8)
 project(projekt_4)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message("Setting DEBUG flags")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g -Wall")
+endif()
+
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    message("Setting RELEASE flags")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 

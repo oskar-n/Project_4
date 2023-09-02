@@ -140,8 +140,6 @@ public:
 
   void add_to_path(FLOORS floor) {
     m_path.add(floor);
-    auto y = m_rectangle.getPosition().y;
-
     std::sort(m_path.begin(), m_path.end(), [this](auto &a, auto &b) {
       return abs(a - (this->get_y())) < abs(b - (this->get_y()));
     });
@@ -159,7 +157,6 @@ public:
           move_next();
           clock.restart();
         }
-        std::cout << clock.getElapsedTime().asSeconds() << std::endl;
       }
     } else
       clock.restart();
