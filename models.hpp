@@ -469,7 +469,8 @@ public:
         continue;
       if (i->m_goal != Goal)
         continue;
-      i->set_pos(Goal, find_drop_off_point(Goal, m_elevator.get_x(), offset) + (offset * (n++ % 8)));
+      i->set_pos(Goal, find_drop_off_point(Goal, m_elevator.get_x(), offset) +
+                           (offset * (n++ % 8)));
       move_to_leftovers(i);
       toRemove.push_back(i);
       m_counter.down_count();
@@ -477,6 +478,7 @@ public:
     for (auto i : toRemove) {
       humans.erase(std::remove(humans.begin(), humans.end(), i), humans.end());
     }
+    toRemove.clear();
     return true;
   }
 
@@ -492,11 +494,12 @@ public:
     if (!(*human)->move(m_elevator.get_x(), dt)) {
       m_elevator.add_to_path((FLOORS)(*human)->m_goal);
       if (!m_elevator.move_human_inside(*human)) {
-        std::for_each(humans.begin(), humans.end(), [this](auto &i) {
+        std::for_each(humans.begin(), humans.end(), [&](auto &i) {
           if (i == nullptr)
             return;
           move_to_leftovers(i);
         });
+        humans.clear();
         return true;
       }
       humans.pop_front();
