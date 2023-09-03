@@ -7,7 +7,7 @@
 
 ----
 ### How to use
-<font size="5">Firstly, user of the program need to click the numbered button above one of the platforms. Then, a human appears on the screen who travels to the floor that was previously selected. Elevator can take up to 8 passengers. The overall weight is displayed on the counter at the top of the screen. After 5 seconds without any user input or action, elevator goes back to first floor.  </font>
+<font size="5">Firstly, user of the program need to click the numbered button above one of the platforms. Then, a human appears on the screen who travels to the floor that was previously selected. Elevator can take up to 8 passengers. The overall weight is displayed on the counter at the top of the screen. After 5 seconds without any user input or action, elevator goes back to first floor. Escape key or 'X' in the top right corner closes the program.  </font>
 
 ----
 ### Technical description
