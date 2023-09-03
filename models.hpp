@@ -437,8 +437,13 @@ class ObjectManager {
   {
     sf::Event event;
     while (m_window.pollEvent(event)) {
-      if (event.type == sf::Event::KeyPressed && event.key.scancode == sf::Keyboard::Scan::Escape) m_window.close();
-      if (event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
+      if (event.type == sf::Event::Closed)
+        m_window.close();
+      if (event.type == sf::Event::KeyPressed &&
+          event.key.scancode == sf::Keyboard::Scan::Escape)
+        m_window.close();
+      if (event.type == sf::Event::MouseButtonPressed &&
+          event.mouseButton.button == sf::Mouse::Left) {
         for (auto i : m_buttongroups) {
           buttongr_pressed(i);
         }
@@ -502,8 +507,12 @@ class ObjectManager {
     m_window.setFramerateLimit(500);
     while (m_window.isOpen()) {
       handle_events();
-      if (! m_elevator.moving(dt)) {
-        if (pick_up((FLOORS)m_elevator.get_y()) && drop_off((FLOORS)m_elevator.get_y())) { m_elevator.move_next(); }
+
+      if (!m_elevator.moving(dt)) {
+        if (drop_off((FLOORS)m_elevator.get_y()) &&
+            pick_up((FLOORS)m_elevator.get_y()) ) {
+          m_elevator.move_next();
+        }
       }
       move_leftovers(dt);
       m_elevator.return_check(m_clock, areAllFloorsEmpty(m_floors));
