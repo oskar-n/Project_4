@@ -152,30 +152,23 @@ public:
     // }
   }
 
-
   int get_y() const { return m_rectangle.getPosition().y; }
 
-  void return_check(sf::Clock &clock, bool areAllFloorsEmpty){
-    if(get_y() != FLOORS::FIRST)
-    { 
-      if(  areAllFloorsEmpty != true || m_humans.size() != 0)
-      {
+  void return_check(sf::Clock &clock, bool areAllFloorsEmpty) {
+    if (get_y() != FLOORS::FIRST) {
+      if (areAllFloorsEmpty != true || m_humans.size() != 0) {
         clock.restart();
+      } else {
+        if (clock.getElapsedTime().asSeconds() > 5) {
+          m_Goal = FLOORS::FIRST;
+          move_next();
+          clock.restart();
+        }
+        std::cout << clock.getElapsedTime().asSeconds() << std::endl;
       }
-      else 
-      {  
-        if(clock.getElapsedTime().asSeconds() > 5)
-            {
-              m_Goal = FLOORS::FIRST;
-              move_next();
-              clock.restart();
-            }
-            std::cout<<clock.getElapsedTime().asSeconds()<<std::endl;
-      }
-    }
-    else clock.restart();
+    } else
+      clock.restart();
   }
-
 
   bool moving(int dt) {
     if (m_rectangle.getPosition().y > m_Goal) {
@@ -306,20 +299,20 @@ inline FLOORS find_floor(int y) {
                                FLOORS::FOURTH, FLOORS::FIFTH,  0};
   for (int i = 0; i < floors.size() - 1; i++) {
     if (y <= floors[i] && y > floors[i + 1]) {
-      return (FLOORS)floors[i]; 
+      return (FLOORS)floors[i];
     }
   }
   throw std::runtime_error("No floor found");
 };
-//checks if there are humans 
+// checks if there are humans
 bool areAllFloorsEmpty(const Floors &floors) {
-    for (const auto &floorPair : floors) {
-        const Floor &floor = floorPair.second;
-        if (floor.m_humans.size() != 0)  {
-            return false; // If any floor is not empty, return false.
-        }
+  for (const auto &floorPair : floors) {
+    const Floor &floor = floorPair.second;
+    if (floor.m_humans.size() != 0) {
+      return false; // If any floor is not empty, return false.
     }
-    return true; // All floors are empty.
+  }
+  return true; // All floors are empty.
 }
 
 class Counter {
@@ -361,19 +354,24 @@ public:
   int get_count() { return m_count; }
 };
 
-inline int find_drop_off(int y, int elevator_x) {
+inline int find_drop_off_point(int y, int elevator_x, int &offset) {
   FLOORS floor = find_floor(y);
   std::cerr << "Floor: " << (int)floor << std::endl;
   switch (floor) {
   case FLOORS::FIRST:
+    offset = -50;
     return elevator_x;
   case FLOORS::SECOND:
+    offset = 50;
     return elevator_x + ELEVATOR_WIDTH;
   case FLOORS::THIRD:
+    offset = -50;
     return elevator_x;
   case FLOORS::FOURTH:
+    offset = 50;
     return elevator_x + ELEVATOR_WIDTH;
   case FLOORS::FIFTH:
+    offset = -50;
     return elevator_x;
   default:
     throw std::runtime_error("No floor found");
@@ -410,22 +408,30 @@ class ObjectManager {
       }
     }
   }
-
-  void move_leftovers() {
+  void move_leftovers(float dt) {
     if (m_LeftOvers.empty())
       return;
     std::vector<Human *> DeleteHumans;
-    for (auto &i : m_LeftOvers) {
-      if (i == nullptr)
+    // Use an iterator to avoid issues when erasing elements from the vector
+    auto it = m_LeftOvers.begin();
+    while (it != m_LeftOvers.end()) {
+      Human *i = *it;
+      if (i == nullptr) {
+        ++it;
         continue;
+      }
       int floor_border = m_floors.at(find_floor(i->get_y())).m_border;
       if (!i->move(floor_border, dt)) {
         DeleteHumans.push_back(i);
+        it =
+            m_LeftOvers.erase(it); // Erase the element and advance the iterator
+        delete i;
+      } else {
+        ++it; // Move to the next element
       }
     }
+    // Set pointers to nullptr for elements that were deleted
     for (auto &i : DeleteHumans) {
-      m_LeftOvers.erase(std::find(m_LeftOvers.begin(), m_LeftOvers.end(), i));
-      delete i;
       i = nullptr;
     }
   }
@@ -457,18 +463,24 @@ public:
 
   bool drop_off(FLOORS Goal) {
     auto &humans = m_elevator.m_humans;
+    int offset = 0;
+    int n = 0;
     if (humans.empty())
       return true;
+    std::vector<Human *> toRemove;
     for (auto &i : humans) {
       if (i == nullptr)
         continue;
       if (i->m_goal != Goal)
         continue;
-      i->set_pos(Goal, find_drop_off(Goal, m_elevator.get_x()));
+      i->set_pos(Goal, find_drop_off_point(Goal, m_elevator.get_x(), offset) +
+                           (offset * (n++ % 8)));
       move_to_leftovers(i);
-      humans.erase(std::find(humans.begin(), humans.end(), i));
+      toRemove.push_back(i);
       m_counter.down_count();
-      // i = nullptr; at this point the human is moved to the left overs
+    }
+    for (auto i : toRemove) {
+      humans.erase(std::remove(humans.begin(), humans.end(), i), humans.end());
     }
     return true;
   }
@@ -512,7 +524,7 @@ public:
           m_elevator.move_next();
         }
       }
-      move_leftovers();
+      move_leftovers(dt);
       m_elevator.return_check(m_clock, areAllFloorsEmpty(m_floors));
       m_window.clear(sf::Color::White);
       draw(m_window, m_counter, m_buttongroups, m_floors, m_LeftOvers,
