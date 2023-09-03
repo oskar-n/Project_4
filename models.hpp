@@ -512,8 +512,8 @@ public:
     while (m_window.isOpen()) {
       handle_events();
       if (!m_elevator.moving(dt)) {
-        if (pick_up((FLOORS)m_elevator.get_y()) &&
-            drop_off((FLOORS)m_elevator.get_y())) {
+        if (drop_off((FLOORS)m_elevator.get_y()) &&
+            pick_up((FLOORS)m_elevator.get_y()) ) {
           m_elevator.move_next();
         }
       }
