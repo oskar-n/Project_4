@@ -140,16 +140,9 @@ public:
 
   void add_to_path(FLOORS floor) {
     m_path.add(floor);
-    auto y = m_rectangle.getPosition().y;
-
     std::sort(m_path.begin(), m_path.end(), [this](auto &a, auto &b) {
       return abs(a - (this->get_y())) < abs(b - (this->get_y()));
     });
-    // Debug
-    // std::cout << "Path: ";
-    // for (auto i : m_path) {
-    //   std::cout << (int)i << " ";
-    // }
   }
 
   int get_y() const { return m_rectangle.getPosition().y; }
@@ -164,7 +157,6 @@ public:
           move_next();
           clock.restart();
         }
-        std::cout << clock.getElapsedTime().asSeconds() << std::endl;
       }
     } else
       clock.restart();
@@ -305,7 +297,8 @@ inline FLOORS find_floor(int y) {
   throw std::runtime_error("No floor found");
 };
 // checks if there are humans
-bool areAllFloorsEmpty(const Floors &floors) {
+
+inline bool areAllFloorsEmpty(const Floors &floors) {
   for (const auto &floorPair : floors) {
     const Floor &floor = floorPair.second;
     if (floor.m_humans.size() != 0) {
@@ -355,23 +348,24 @@ public:
 };
 
 inline int find_drop_off_point(int y, int elevator_x, int &offset) {
+  offset = 50;
+
   FLOORS floor = find_floor(y);
   std::cerr << "Floor: " << (int)floor << std::endl;
   switch (floor) {
   case FLOORS::FIRST:
-    offset = -50;
+    offset = -offset;
     return elevator_x;
   case FLOORS::SECOND:
     offset = 50;
     return elevator_x + ELEVATOR_WIDTH;
   case FLOORS::THIRD:
-    offset = -50;
+    offset = -offset;
     return elevator_x;
   case FLOORS::FOURTH:
-    offset = 50;
     return elevator_x + ELEVATOR_WIDTH;
   case FLOORS::FIFTH:
-    offset = -50;
+    offset = -offset;
     return elevator_x;
   default:
     throw std::runtime_error("No floor found");
@@ -462,9 +456,9 @@ public:
   }
 
   bool drop_off(FLOORS Goal) {
-    auto &humans = m_elevator.m_humans;
     int offset = 0;
     int n = 0;
+    auto &humans = m_elevator.m_humans;
     if (humans.empty())
       return true;
     std::vector<Human *> toRemove;
@@ -473,8 +467,7 @@ public:
         continue;
       if (i->m_goal != Goal)
         continue;
-      i->set_pos(Goal, find_drop_off_point(Goal, m_elevator.get_x(), offset) +
-                           (offset * (n++ % 8)));
+      i->set_pos(Goal, find_drop_off_point(Goal, m_elevator.get_x(), offset) + (offset * (n++ % 8)));
       move_to_leftovers(i);
       toRemove.push_back(i);
       m_counter.down_count();
