@@ -15,7 +15,18 @@
 <font size="5">Project uses SFML library to display a window. Every object has it's own separate class and 'ObjectManager' operates the whole program. Floors and elevator have their own containers for humans. Elevator movement is based on a queue that chooses optimal route to drop off passengers.
 </font>
 
+
 ---
+### Compiling
+```sh
+git clone https://github.com/oskar-n/Project_4 &&
+cd Project_4 &&
+cd build &&
+cmake -DCMAKE_BUILD_TYPE=Release .. &&
+make -j4
+```  
+---
+
 ### Creators
 <font size="5">Hubert Rotkiewicz, Oskar Nakielski </font>
 

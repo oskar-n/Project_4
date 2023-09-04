@@ -1,3 +1,0 @@
-/home/hubert/projects/Project_4/build/CMakeFiles/projekt_4.dir
-/home/hubert/projects/Project_4/build/CMakeFiles/edit_cache.dir
-/home/hubert/projects/Project_4/build/CMakeFiles/rebuild_cache.dir

@@ -11,15 +11,17 @@
 #include <unordered_map>
 #include <utility>
 
-constexpr int SCREEN_WIDTH   = 1500;
-constexpr int SCREEN_HEIGHT  = 1200;
-constexpr int BUTTON_WIDTH   = 50;
-constexpr int ELEVATOR_WIDTH = 290;
-constexpr int ELEVATOR_HIGHT = 190;
-constexpr int FLOOR_HIGHT    = 40;
-constexpr int COUNTER_WIDTH  = 200;
-constexpr int COUNTER_HIGHT  = 50;
-constexpr int HUMAN_WEIGHT   = 70;
+constexpr int SCREEN_WIDTH      = 1500;
+constexpr int SCREEN_HEIGHT     = 1200;
+constexpr int BUTTON_WIDTH      = 50;
+constexpr int ELEVATOR_WIDTH    = 290;
+constexpr int ELEVATOR_HIGHT    = 190;
+constexpr int FLOOR_HIGHT       = 40;
+constexpr int COUNTER_WIDTH     = 200;
+constexpr int COUNTER_HIGHT     = 50;
+constexpr int HUMAN_WEIGHT      = 70;
+constexpr int NUMBER_OF_FLOORS  = 6;
+constexpr int NUMBER_OF_BUTTONS = 5;
 
 enum FLOORS {
   FIRST  = 950,
@@ -45,8 +47,6 @@ class Human {
     set_pos(y, 50, offset);
   }
 
-  int get_x() const { return m_sprite.getPosition().x; }
-
   int get_y() const { return m_sprite.getPosition().y - m_sprite.getGlobalBounds().height; }
 
   void set_pos(int y, int x = 50, int offset = 0)
@@ -71,12 +71,11 @@ class Human {
   {
     static int angle = 30;
     static sf::Clock clock;
-    m_sprite.setRotation(angle*dt);
+    m_sprite.setRotation(angle * dt);
     if (clock.getElapsedTime().asSeconds() > 0.2) {
-      angle = -angle; 
+      angle = -angle;
       clock.restart();
     }
-  
   }
 
   bool move(int goal_x, double dt)
@@ -100,7 +99,7 @@ void Human_cleanup(Container auto &cont)
 {
   if (cont.empty()) return;
   for (auto &i : cont) {
-    if (i == nullptr) continue;
+    if (i == nullptr) continue; //theoretically this should never happen, but better safe than sorry
     delete i;
   }
 }
@@ -296,7 +295,8 @@ inline Floors make_floors(int pos_x, sf::Color color)
 // finds the correct floor, based on the y coordinate
 inline FLOORS find_floor(int y)
 {
-  std::array<int, 6> floors = { FLOORS::FIRST, FLOORS::SECOND, FLOORS::THIRD, FLOORS::FOURTH, FLOORS::FIFTH, 0 };
+  std::array<int, NUMBER_OF_FLOORS> floors = { FLOORS::FIRST,  FLOORS::SECOND, FLOORS::THIRD,
+                                               FLOORS::FOURTH, FLOORS::FIFTH,  0 };
   for (int i = 0; i < floors.size() - 1; i++) {
     if (y <= floors[i] && y > floors[i + 1]) { return (FLOORS)floors[i]; }
   }
@@ -356,8 +356,7 @@ class Counter {
 
 inline int find_drop_off_point(int y, int elevator_x, int &offset)
 {
-  offset = 50;
-
+  offset       = 50;
   FLOORS floor = find_floor(y);
   switch (floor) {
   case FLOORS::FIRST:
@@ -381,7 +380,7 @@ inline int find_drop_off_point(int y, int elevator_x, int &offset)
 
 class ObjectManager {
   Elevator m_elevator{ FLOORS::FIRST, sf::Color::Blue };
-  std::array<Buttongroup, 5> m_buttongroups = {
+  std::array<Buttongroup, NUMBER_OF_BUTTONS> m_buttongroups = {
     make_buttons(50, FLOORS::FIRST, sf::Color::Red),
     make_buttons(SCREEN_WIDTH - 50 - BUTTON_WIDTH * 5, FLOORS::SECOND, sf::Color::Red),
     make_buttons(50, FLOORS::THIRD, sf::Color::Red),
@@ -410,7 +409,6 @@ class ObjectManager {
   {
     if (m_LeftOvers.empty()) return;
     std::vector<Human *> DeleteHumans;
-    // Use an iterator to avoid issues when erasing elements from the vector
     auto it = m_LeftOvers.begin();
     while (it != m_LeftOvers.end()) {
       Human *i = *it;
@@ -421,17 +419,14 @@ class ObjectManager {
       int floor_border = m_floors.at(find_floor(i->get_y())).m_border;
       if (! i->move(floor_border, dt)) {
         DeleteHumans.push_back(i);
-        it = m_LeftOvers.erase(it); // Erase the element and advance the iterator
+        it = m_LeftOvers.erase(it);
         delete i;
       }
       else {
-        ++it; // Move to the next element
+        ++it;
       }
     }
-    // Set pointers to nullptr for elements that were deleted
-    for (auto &i : DeleteHumans) {
-      i = nullptr;
-    }
+    DeleteHumans.clear();
   }
 
    public:
@@ -449,13 +444,9 @@ class ObjectManager {
   {
     sf::Event event;
     while (m_window.pollEvent(event)) {
-      if (event.type == sf::Event::Closed)
-        m_window.close();
-      if (event.type == sf::Event::KeyPressed &&
-          event.key.scancode == sf::Keyboard::Scan::Escape)
-        m_window.close();
-      if (event.type == sf::Event::MouseButtonPressed &&
-          event.mouseButton.button == sf::Mouse::Left) {
+      if (event.type == sf::Event::Closed) m_window.close();
+      if (event.type == sf::Event::KeyPressed && event.key.scancode == sf::Keyboard::Scan::Escape) m_window.close();
+      if (event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
         for (auto i : m_buttongroups) {
           buttongr_pressed(i);
         }
@@ -520,11 +511,8 @@ class ObjectManager {
     while (m_window.isOpen()) {
       handle_events();
 
-      if (!m_elevator.moving(dt)) {
-        if (drop_off((FLOORS)m_elevator.get_y()) &&
-            pick_up((FLOORS)m_elevator.get_y()) ) {
-          m_elevator.move_next();
-        }
+      if (! m_elevator.moving(dt)) {
+        if (drop_off((FLOORS)m_elevator.get_y()) && pick_up((FLOORS)m_elevator.get_y())) { m_elevator.move_next(); }
       }
       move_leftovers(dt);
       m_elevator.return_check(m_clock, areAllFloorsEmpty(m_floors));
