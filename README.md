@@ -2,7 +2,7 @@
 ----
 ### Project Description
 
-<font size="5">This program is written for a Linux environment. The main objective of this project is to simulate a simple elevator. User can create passengers that travel to chosen floors.
+<font size="5">This program is written for a Linux environment and is built using CMake. The main objective of this project is to simulate a simple elevator. User can create passengers that travel to chosen floors.
  </font>
 
 ----

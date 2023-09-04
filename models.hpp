@@ -67,11 +67,18 @@ class Human {
     if (! m_texture.loadFromFile("human.png")) { std::cerr << "Error loading texture" << std::endl; }
   }
 
+  void rotation(double dt)
+  {
+    static int angle = 40;
+      m_sprite.setRotation(angle*dt/2);
+      angle = -angle; 
+  
+  }
   bool move(int goal_x, double dt)
   {
     const auto human_x = m_sprite.getPosition().x;
     if (human_x == goal_x) { return false; }
-
+    rotation(dt);
     if (human_x < goal_x)
       m_sprite.move(m_speed, 0);
     else if (human_x > goal_x)
