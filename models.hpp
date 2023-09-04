@@ -69,11 +69,16 @@ class Human {
 
   void rotation(double dt)
   {
-    static int angle = 40;
-      m_sprite.setRotation(angle*dt/2);
+    static int angle = 30;
+    static sf::Clock clock;
+    m_sprite.setRotation(angle*dt);
+    if (clock.getElapsedTime().asSeconds() > 0.2) {
       angle = -angle; 
+      clock.restart();
+    }
   
   }
+
   bool move(int goal_x, double dt)
   {
     const auto human_x = m_sprite.getPosition().x;
