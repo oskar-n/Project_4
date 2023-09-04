@@ -184,6 +184,21 @@ class Elevator {
     return true;
   }
 
+  bool pause(bool &elev_pause)
+  {
+    static sf::Clock clock;
+    if (elev_pause && clock.getElapsedTime().asSeconds() < 2) {
+      return false;
+    }
+    else {
+      elev_pause = false;
+      clock.restart();
+      return true;
+    }
+
+    }
+  
+
   void draw(sf::RenderWindow &window) const { window.draw(m_rectangle); }
 
   ~Elevator() { Human_cleanup(m_humans); }
@@ -350,7 +365,7 @@ class Counter {
     window.draw(m_text);
   }
   void up_count() { m_count = m_count + HUMAN_WEIGHT; }
-  void down_count() { m_count = m_count - HUMAN_WEIGHT; }
+  void down_count() { m_count = m_count - HUMAN_WEIGHT;}
   int get_count() { return m_count; }
 };
 
@@ -392,6 +407,7 @@ class ObjectManager {
   sf::Clock m_clock;
   sf::RenderWindow m_window{ sf::VideoMode(SCREEN_WIDTH, SCREEN_HEIGHT), "Elevator" };
   const double dt = 0.1;
+  bool elev_pause = false;
   std::deque<HumanPtr> m_LeftOvers;
   Counter m_counter{ SCREEN_WIDTH / 2 - COUNTER_WIDTH / 2, 0, sf::Color::Blue };
   void spawn_human(FLOORS Beg, FLOORS goal)
@@ -463,7 +479,7 @@ class ObjectManager {
     }
   }
 
-  bool drop_off(FLOORS Goal)
+  bool drop_off(FLOORS Goal, bool &pause)
   {
     int offset   = 0;
     int n        = 0;
@@ -478,6 +494,7 @@ class ObjectManager {
       move_to_leftovers(i);
       toRemove.push_back(i);
       m_counter.down_count();
+      pause = true;
     }
     for (auto i : toRemove) {
       humans.erase(std::remove(humans.begin(), humans.end(), i), humans.end());
@@ -521,9 +538,9 @@ class ObjectManager {
       handle_events();
 
       if (!m_elevator.moving(dt)) {
-        if (drop_off((FLOORS)m_elevator.get_y()) &&
+        if (drop_off((FLOORS)m_elevator.get_y(), elev_pause) &&
             pick_up((FLOORS)m_elevator.get_y()) ) {
-          m_elevator.move_next();
+          if(m_elevator.pause(elev_pause)) m_elevator.move_next();
         }
       }
       move_leftovers(dt);
